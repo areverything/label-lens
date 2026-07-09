@@ -1,109 +1,139 @@
-# Label Lens — Build Plan
+# Label Lens — Project Plan
 
-A food-additive **intelligence** RAG app. Scan a product and ask what a scanner can't answer: which additives are **banned somewhere else**, what the **evidence** actually says, and whether you're **over a safe limit across your day**. Cited from the open food catalog, four regulators, and a distilled brief that lives in no single database.
+Label Lens is a food-additive **intelligence** app. You give it a packaged food, and it tells you what a barcode scanner can't: which of the additives inside are **banned or restricted in other countries**, what the **scientific evidence** actually says about them, and whether they're under a recall or a fresh government ban. Every answer is **cited** from official regulators.
 
-This is the AI Engineering Certification capstone (due **2026-07-14**). The full rationale and the runner-up ideas live in the Obsidian vault at `AI Engineering Certification v1.0/Capstone — Build Kickoff (Label Lens).md`. This file is the buildable plan; it is self-contained, so a fresh session can work from it alone.
+This document is the engineering plan and the rationale behind every design choice, written so someone with no background in AI retrieval systems or in food chemistry can follow it. It is built to satisfy the AI Engineering Certification **Certification Challenge** (7 tasks, due 2026-07-14).
 
-## Quick Start
+## Reviewers start here
 
-```bash
-cd ~/code/courses/label_lens
-uv init .
-uv add langgraph langchain langchain-community duckdb httpx pandas openpyxl rank-bm25 fastapi "uvicorn[standard]" python-dotenv
-uv add --dev ragas pytest
-# LLM gateway key (OpenRouter or similar) goes in .env.local
-```
+The graded, deliverable-by-deliverable write-up lives in **[`docs/SUBMISSION.md`](./docs/SUBMISSION.md)**. It opens with a **coverage checklist**: one row per required deliverable, each linking to exactly where that deliverable is answered (a doc section, a code file, or an evaluation result). Read that table top to bottom to confirm nothing is missing, then click through. This `PLAN.md` is the "why and how" that the checklist links into for depth.
 
-Then open a **new Claude Code session in this folder** and paste the kickoff prompt at the bottom of this file. Day 1 is the data join, not the app.
+---
 
-## The one thing that matters
+## Part 1 — The domain in one minute
 
-**The join is the whole project.** No pre-built cross-walk maps the same additive across the EU, FDA, IARC, and California. Each regulator keys its data differently:
+**What is a food additive?** A substance mixed into packaged food for a purpose: **colours** (make candy bright), **preservatives** (stop it spoiling), **sweeteners** (sugar-free soda), **antioxidants** (keep fats from going rancid). They are useful. Preservatives prevent food poisoning and waste; colours and sweeteners make food people want to eat, often more cheaply.
 
-- **E-number** (EU, Open Food Facts)
-- **CAS number** (FDA, IARC, EFSA OpenFoodTox)
-- **FDA substance name**, **IARC agent name**
+**How they can hurt.** Some additives are contested. A few colours have been linked to hyperactivity in children. A handful are flagged as possible carcinogens. And regulators around the world disagree sharply: an additive that is normal in a US candy bar can be banned, or carry a warning label, in Europe.
 
-Reconciling these into **one canonical additive** is the engineering, and it is the moat: no single source and no base model can hand it to you. **CAS number is the join key.** Open Food Facts + OpenFoodTox both carry E-number *and* CAS, so they bridge everything else.
+**The honest framing this app is built around:** *"banned somewhere" is not the same as "proven harmful."* Often two regulators looked at the **same** evidence and made different judgment calls. Label Lens shows what each regulator decided **and** what the evidence says, keeps those two ideas separate, and refuses to give medical advice.
 
-Second rule, baked into the schema: keep **legal status** (FDA / EU / California) separate from **hazard assessment** (EFSA / IARC). They answer different questions, and conflating them breaks the safety boundary ("banned somewhere" ≠ "proven harmful").
+## Part 2 — The core engineering problem
 
-## Architecture: Document D is two layers + live tools
+To answer "is this additive banned in the EU?" you must combine data from several regulators. But each one **identifies additives differently**, and no ready-made table links them:
 
-The retrievable unit is a **per-additive intelligence brief**. An agent routes each question to one of three lanes:
+- **Europe** uses an **E-number** (a short code; titanium dioxide is `E171`).
+- **The US FDA** uses chemical names and its own IDs.
+- **Cancer researchers (IARC)** use yet another naming scheme.
 
-| Lane | What it is | Example question | Graded by |
+The one identifier they can all share is the **CAS number**, a globally unique ID for a chemical substance (titanium dioxide is `13463-67-7`). So the core engineering task is **matching each additive across every source using CAS as the common key**. No single database and no off-the-shelf chatbot can hand you this; building it is the project's moat, and it is what makes the app do something a generic AI cannot.
+
+---
+
+## Part 3 — The solution and its architecture (Task 2)
+
+**One-sentence solution:** an agentic RAG assistant that, given a product's additives, answers plain-language questions by routing each one to the right source and returning a cited, regulator-grounded answer.
+
+The assistant routes every question to one of **three lanes**:
+
+| Lane | What it holds | Example question | How it answers |
 |---|---|---|---|
-| **Store** (query) | Product facts + a per-additive **legal-status table** (one row per additive × jurisdiction) | "Is E171 banned in the EU?" | tool-call accuracy |
-| **RAG** (retrieval) | Distilled **regulatory-divergence + evidence prose** | "Why did the EU ban it, and is it actually dangerous?" | the retrieval ladder |
-| **Live** (tools) | openFDA recalls + Federal Register new bans | "Is this recalled? Any FDA action since last month?" | tool-call accuracy |
+| **Store** | Structured facts: each additive's legal status per region (a database table) | "Is E171 banned in the EU?" | a direct database lookup (a tool call) |
+| **RAG** | Distilled **per-additive briefs**: prose explaining the regulatory divergence and what the evidence says | "Why did the EU ban it, and is it actually dangerous?" | retrieve the relevant brief passages, answer from them |
+| **Live** | Nothing stored; calls government APIs at question time | "Is this recalled? Any FDA action this month?" | live external API call |
 
-The **RAG lane is the real value-add** and where the retrieval-ladder eval story lives. The store and live lanes make it agentic.
+The **RAG lane is the heart of the project** (it holds knowledge that exists in no single database), and it is where the evaluation story lives. The Store and Live lanes make the assistant **agentic**: it decides which tool to call.
 
-### Additive-brief schema
+### The technology choices, and why each one
 
-- **Identity** — `e_number`, `name`, `additives_classes`, **CAS** (from OFF additives taxonomy).
-- **Regulatory status** — one row per jurisdiction: EU (Reg 1333/2008 + ban amendments), US/FDA (Substances Added to Food + 21 CFR), California (Prop 65 + AB 418's four additives), IARC (hazard group, flagged hazard-not-law).
-- **Evidence** — EFSA ADI (OpenFoodTox, structured) + reasoning distilled from EFSA opinions; IARC group + exposure route.
-- **Live watch** — recall status (openFDA), new Federal Register action.
+Every component below is a required item in the Certification Challenge's infrastructure list. The "why" is the one-line justification the challenge asks for.
 
-> **Worked example (real as of 2026):** Titanium dioxide (E171, CAS 13463-67-7). EU **banned in food since 2022** (Reg (EU) 2022/63) after EFSA's 2021 opinion withdrew the ADI over nanoparticle genotoxicity; **FDA still permits it** (21 CFR 73.575); IARC Group 2B is for **inhaled** dust, not diet. Honest brief: regulators weighed the same evidence differently, not settled-dangerous.
+| Component | Choice | Why this choice |
+|---|---|---|
+| **LLM gateway** | **OpenRouter** | The challenge requires routing model calls through a gateway rather than a raw provider. OpenRouter is one key, many swappable models, minimal code. |
+| **LLM** | a strong general model via OpenRouter (configurable) | The gateway makes the specific model swappable; we tune for cost vs quality during evals. |
+| **Agent orchestration** | **LangGraph** | Purpose-built for an agent that reasons, routes to tools, and carries memory; integrates with our tracing. |
+| **Tools** | status-query (database), brief-retriever (RAG), openFDA-recall, Federal-Register-ban | These realise the three lanes; the two live government APIs are the required external search. |
+| **Embedding model** | **bge-small-en-v1.5**, run locally on the Mac (Apple Silicon / MPS) | The brief corpus is tiny, so a small local model is free, fast, and needs no external API. |
+| **Vector database** | **Chroma** (a local file, no server) | Simplest possible vector store for a small corpus; nothing to run or host. |
+| **Monitoring** | **LangSmith** | Traces every agent step and retrieval so we can debug and back the evaluation story with real run data. |
+| **Evaluation framework** | **RAGAS** + a prompted **LLM-as-judge** | RAGAS scores retrieval quality; the judge scores whether the final answer is correct, grounded, and safe. |
+| **User interface** | **Streamlit** | One Python file gives a chat UI that works in a phone and laptop browser (both required). |
+| **Deployment** | **Streamlit Community Cloud** | Free public URL, which satisfies the public-endpoint requirement and the phone requirement together. |
+| **Structured store** | **DuckDB** | A lightweight local database holding the additive and regulatory-status tables (already built). |
 
-## Data sources (verified 2026-07-08)
+### How a question flows through the app (the agent workflow)
 
-| Source | Feeds | Difficulty | Access |
-|---|---|---|---|
-| **Open Food Facts** products + additives taxonomy | The spine (E-number↔CAS↔class), product facts | Easy | Parquet on HF (filter w/ DuckDB) + v2 barcode API; no key, User-Agent; ODbL. Taxonomy: `static.openfoodfacts.org/data/taxonomies/additives.json` |
-| **FDA Substances Added to Food + SCOGS** | US legal/GRAS status, 21 CFR cite, CAS | Easy | Excel export, CFSAN portal; public domain |
-| **Federal Register + eCFR Title 21** | Bans/revocations (Red 3, BVO); current code; **live ban tool** | Easy | Free JSON/CSV API, no key (`federalregister.gov/developers`, `ecfr.gov/developers`) |
-| **IARC classifications** | Cancer-hazard group (thin coverage) | Easy | Sortable spreadsheet by agent/group/CAS |
-| **California OEHHA** | Prop 65 list + AB 418 (4 additives) | Easy | Prop 65 Excel; AB 418 hardcoded from bill |
-| **EFSA OpenFoodTox** | Structured ADI/hazard; reasoning in PDFs | Medium | DB on Zenodo (v3.0, Apr 2026) + EFSA Journal PDFs |
-| **EU Reg 1333/2008 Annex II** | EU authorized-additive conditions | Medium | Consolidated EUR-Lex table; needs parsing |
-| **openFDA food enforcement** | Recalls; **live tool** | Easy | `api.fda.gov/food/enforcement.json`, key optional (1000/day free). Matches by name not barcode (fuzzy), US-only |
+1. The user asks a question about a product (or one of its additives) in the chat UI.
+2. The **LangGraph agent** reads the question and its **memory** (the user's saved diet/allergy profile and logged products) and decides which lane(s) to use.
+3. For a legal-status fact, it calls the **Store** tool (a database query). For a "why / is it dangerous" question, it **retrieves** the relevant per-additive brief passages (**RAG**). For "is this recalled / any recent ban," it calls a **Live** government API.
+4. It composes a single cited answer, keeping legal status, hazard classification, and personal harm strictly separate, and refusing medical verdicts.
+5. The answer is returned in the browser. (No human approval step is required; the safety boundary is enforced in the prompt and the routing.)
 
-Everything is open and no-cost. The effort is entity resolution, not downloads.
+The rendered infrastructure and agent-workflow diagrams live in `docs/SUBMISSION.md` §2.
 
-## Proposed stack
+### Required capabilities, and where they are met
+- **LLM gateway:** OpenRouter (above).
+- **Memory:** a per-user diet/allergy profile plus a log of products they've asked about, stored in DuckDB, so the agent can answer cumulative questions ("across everything I logged today, am I over any safe limit?").
+- **Runs on phone and laptop in a browser:** Streamlit UI on a public Community Cloud URL.
 
-- **Python 3.12 via `uv`** (macOS Apple Silicon; use MPS for any local model).
-- **Structured store + ETL:** DuckDB (also does the OFF Parquet filtering) or SQLite. One canonical `additives` table keyed by CAS; a `product` table; a `user_profile` + `pantry` table for memory.
-- **Agent + tools:** LangGraph. Tools = status-query, brief-retriever, openFDA-recall, federal-register-ban.
-- **LLM gateway (rubric-required):** OpenRouter or LiteLLM.
-- **Vector store + retrieval ladder:** Qdrant (local docker) or Chroma. Dense baseline → BM25/hybrid → reranker (Cohere API or local `bge-reranker` on MPS) → multi-query (LangChain `MultiQueryRetriever`) → parent-child (`ParentDocumentRetriever`).
-- **Backend:** FastAPI. **Frontend:** keep it lean for the deadline (Streamlit for speed, or FastAPI + a small chat UI; must work on phone + laptop). Decide Day 3.
-- **Deploy:** Render / Vercel / FastAPI Cloud (public endpoint required).
-- **Eval:** Ragas + a hand-built gold set; LLM-as-judge for outcome, retrieval metrics per rung.
+---
 
-## Phased plan (the five-day cut)
+## Part 4 — The data, and how it's built (Task 3)
 
-**Scope first, small:** a few dozen high-interest additives (flagged colours, preservatives, sweeteners) and **one product category** (e.g. US snacks/cereals), so the cross-walk is hand-verifiable.
+### Our own data: the per-additive briefs (the RAG corpus)
 
-1. **Day 1 — Spine + join.** Build the E-number↔CAS spine from the OFF taxonomy. Pull FDA (Excel), EU, IARC, Prop 65; resolve entities into one canonical additive table keyed by CAS. Load product facts for the chosen category from OFF (DuckDB over Parquet). Output: a clean `additives` + `product` store you trust.
-2. **Day 2 — Distill.** Generate the regulatory-divergence + evidence briefs (LLM over the joined data + EFSA reasoning), with provenance on every claim. Hand-verify a gold set against primary sources. This is the synthetic-data / distillation work.
-3. **Day 3 — Baseline agent.** Dense RAG on briefs + status-query tool + live openFDA/Federal Register tools, LangGraph routing, pantry memory, browser UI, deploy. Establish the baseline eval number.
-4. **Day 4 — Climb + eval.** Add hybrid/BM25, reranker, parent-child; measure each rung on the gold set; build the tradeoff table (the graded improvement).
-5. **Day 5 — The ablation + write-up.** Brief-RAG vs a live agent reading raw regulator pages: accuracy, cost, latency, and how stale a base model is on current bans. Record the video.
+The retrievable knowledge is a set of **per-additive intelligence briefs**: for each additive, a short structured document covering its **identity** (names, codes, CAS), its **regulatory status** in each region with citations, and the **evidence** (why a regulator acted, what the safety assessments found). This is distilled by an LLM from the joined regulatory data, with a citation on every claim, then hand-checked against primary sources.
 
-## Eval questions mapped to the ladder
+These briefs are built on top of the **CAS spine** that already exists: 28 additives resolved from E-number to CAS by combining the Open Food Facts additives taxonomy (names, codes) with Wikidata (the CAS numbers), stored in DuckDB alongside curated, cited regulatory-status rows. See [`README.md`](./README.md) for how to build and query it.
 
-- **BM25/hybrid:** "Is E171 banned in the EU?" (exact E-number + jurisdiction tokens)
-- **Reranking:** distinguish two similar preservative briefs (E211 vs E210)
-- **Multi-query:** "is this dye sketchy?" → additive + its four regulators + evidence
-- **Parent-child:** retrieve the additive brief, attach the scanned product
-- **Multi-hop (memory):** "across everything I logged today, am I over any ADI?"
-- **Refusal/faithfulness:** "will this hurt me?" → status + evidence, keep banned/hazard/harmful distinct, refuse medical advice
+### Chunking strategy (and why)
 
-## Safety boundary (bake into the schema, not bolt on)
+**One brief per additive, split on its labelled sections** (identity / regulatory status / evidence). We chose section-based chunks rather than fixed-size chunks because the user's questions map cleanly onto those sections ("is it banned" → status section; "is it dangerous" → evidence section), which keeps each retrieved passage self-contained and its citation intact. The corpus is small enough that this stays simple.
 
-**Banned somewhere ≠ proven harmful. Legal status ≠ hazard ≠ harm. Not medical advice.** The app reports what regulators decided and what the evidence says; it refuses health verdicts and never conflates the three.
+### External data / API (the agentic search)
 
-## Decisions to make before writing code
+The agent searches **live public data** through two government APIs at question time: **openFDA food enforcement** (product recalls) and the **Federal Register** (newly published bans and revocations). These satisfy the challenge's "search publicly available data" requirement and keep answers current in a way a static store cannot. A general web-search tool (e.g. Tavily) is an easy later add if a broader search is wanted.
 
-1. **The additive slice** (which families) and **the one product category**. Smaller than feels comfortable.
-2. **Canonical ID** = CAS, with an E-number and FDA-name alias table. Confirm the OFF/OpenFoodTox bridge covers your slice.
-3. **Frontend choice** (Streamlit vs FastAPI + chat UI) given the deadline.
+---
 
-## Kickoff prompt for a new session
+## Part 5 — Evaluation and improvement (Tasks 5 and 6)
 
-> I'm building my AIEC capstone: **Label Lens**, a food-additive intelligence RAG app, in this folder (`~/code/courses/label_lens`). Read `PLAN.md` first, it's the full plan. Document D is a per-additive brief with two layers: a structured store (product facts + a per-additive legal-status table across EU/FDA/California/IARC) and a RAG corpus (distilled regulatory-divergence + evidence prose), plus live openFDA recall and Federal Register ban tools. The core challenge is entity resolution (E-number ↔ CAS ↔ FDA name ↔ IARC name), CAS is the join key. Start me on **Day 1: pick the additive slice + product category with me, then build the E-number↔CAS spine from the OFF additives taxonomy and join FDA + EU + IARC + Prop 65 into one canonical additive table.** Set up the `uv` environment and the ETL scaffolding.
+### Baseline evaluation (Task 5)
+- **Test dataset:** a gold set of question / expected-answer pairs, grounded in the curated, cited regulatory rows (which double as ground truth).
+- **Harness:** RAGAS for retrieval quality (did we fetch the right brief passages?) plus a prompted LLM-as-judge for the final answer (is it correct, grounded in the citation, and safe, meaning it never conflates *banned* with *hazardous* with *harmful*?).
+- We record a **baseline** number before any tuning.
+
+### Measured improvements (Task 6)
+- **Advanced retriever:** add a **reranker** (bge-reranker, run locally) on top of the dense-retrieval baseline. Rationale: it should better separate near-identical briefs (for example the two preservatives E210 and E211). We report a **before/after table** on the gold set.
+- **One other change:** **hybrid retrieval** (combine keyword BM25 search with dense search). Rationale: questions contain exact tokens (E-numbers, CAS numbers, "21 CFR") that keyword search matches and pure meaning-based search can miss. Again measured on the gold set.
+
+---
+
+## Part 6 — Safety boundary (built into the data, not bolted on)
+
+**Legal status ≠ hazard classification ≠ personal harm. Not medical advice.** The app reports what regulators decided and what the evidence says; it refuses health verdicts and never conflates the three. This is enforced in the data schema (legal status and hazard are separate columns) and in the agent's prompt, and it is one of the things the evaluation judge checks.
+
+## Part 7 — Deployment and access (Task 4)
+
+The finished prototype is a Streamlit chat app deployed to Streamlit Community Cloud, giving a public URL that works in a phone or laptop browser. The demo shows a **live** tool call (a real recall or ban lookup), not a cached table.
+
+---
+
+## Scope and current state
+
+**Scope (deliberately small, so the cross-source join is hand-verifiable):** 28 additives (mostly synthetic colours, plus marquee preservatives, sweeteners, and the California-banned set), within one product category, **US candy / confectionery**.
+
+**Built and working today:** the CAS spine and the DuckDB store (the 28 additives resolved to CAS, plus 32 curated, cited regulatory-status rows). This is the foundation the briefs and the eval gold set are built from.
+
+**Still to build:** the distilled briefs, the vector index, the LangGraph agent and its tools, the user memory, the Streamlit UI, the public deployment, and the evaluation harness.
+
+## Roadmap (ordered by dependency, not by calendar)
+
+1. Distil the per-additive briefs from the joined data; hand-verify the gold set.
+2. Build the vector index and the dense-retrieval baseline; stand up the LangGraph agent with the Store, RAG, and Live tools and user memory.
+3. Wrap it in the Streamlit UI; deploy to a public URL.
+4. Build the evaluation harness; record the baseline; add the reranker and hybrid retrieval and measure the gains.
+5. Write the Task 7 reflection; record the demo video; finalise `docs/SUBMISSION.md`.
+
+Progress against every individual deliverable is tracked in the checklist at the top of [`docs/SUBMISSION.md`](./docs/SUBMISSION.md).
