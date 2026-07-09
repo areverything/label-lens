@@ -1,9 +1,9 @@
-# Label Lens — Certification Challenge Submission
+# Label Lens: Certification Challenge Submission
 
-This document answers **every deliverable and question** in the Certification Challenge, one section per task. It is the reviewer's entry point. For the full "why" behind any design choice, follow the links into [`../PLAN.md`](../PLAN.md).
+This document answers **every deliverable and question** in the Certification Challenge, one section per task. It is the reviewer's entry point. For the full "why" behind any design choice, follow the links into [`TECH_DESIGN.md`](./TECH_DESIGN.md).
 
-- **Live demo (public endpoint):** _TODO — URL_
-- **Demo video (≤10 min):** _TODO — Loom link_
+- **Live demo (public endpoint):** _TODO: URL_
+- **Demo video (≤10 min):** _TODO: Loom link_
 - **Code:** this repository.
 
 ## Coverage checklist
@@ -18,7 +18,7 @@ One row per required deliverable. `✅` done · `🔨` in progress · `☐` not 
 | 1 | Eval questions / input-output pairs | [§1.4](#14-questions-we-evaluate-against) | 🔨 |
 | 2 | Solution in one sentence | [§2.1](#21-the-solution-one-sentence) | 🔨 |
 | 2 | Infra diagram + one-line why per component | [§2.2](#22-infrastructure) | 🔨 |
-| 2 | Agent-workflow diagram + 1–2 paragraphs | [§2.3](#23-agent-workflow) | 🔨 |
+| 2 | Agent-workflow diagram + 1-2 paragraphs | [§2.3](#23-agent-workflow) | 🔨 |
 | 2 | Gateway + memory + phone/laptop browser | [§2.4](#24-required-capabilities) | 🔨 |
 | 3 | Chunking strategy + why | [§3.1](#31-chunking-strategy) | 🔨 |
 | 3 | Data source + external API + how they interact | [§3.2](#32-data-source-and-external-api) | 🔨 |
@@ -30,14 +30,14 @@ One row per required deliverable. `✅` done · `🔨` in progress · `☐` not 
 | 6 | Advanced retriever + why | [§6.1](#61-advanced-retriever) | ☐ |
 | 6 | Before/after comparison table | [§6.2](#62-beforeafter-results) | ☐ |
 | 6 | One other improvement + eval evidence | [§6.3](#63-second-improvement) | ☐ |
-| 7 | Keep/change reflection for Demo Day | [§7](#task-7--next-steps) | ☐ |
+| 7 | Keep/change reflection for Demo Day | [§7](#task-7-next-steps) | ☐ |
 | Final | Public repo + ≤10-min video + all code | top of this doc | ☐ |
 
 > Status legend so far: the CAS spine and structured store (the Task 3 data foundation) are **built and working**; the sections marked 🔨 have a drafted answer that will be finalised as the app is built; `☐` sections depend on code not yet written.
 
 ---
 
-## Task 1 — Problem, Audience, and Scope
+## Task 1: Problem, Audience, and Scope
 
 ### 1.1 The problem (one sentence)
 
@@ -86,7 +86,7 @@ The evaluation gold set lives in `evals/gold.jsonl` (built in Task 5). Represent
 
 ---
 
-## Task 2 — Proposed Solution
+## Task 2: Proposed Solution
 
 ### 2.1 The solution (one sentence)
 
@@ -94,7 +94,23 @@ An agentic RAG assistant that, given a product's additives, answers plain-langua
 
 ### 2.2 Infrastructure
 
-Each component's one-line justification is in the table in [`PLAN.md` Part 3](../PLAN.md#the-technology-choices-and-why-each-one). The system:
+Every component of the system, with the one-sentence reason it was chosen. Choices that need more than a sentence (tradeoffs and alternatives) are in [TECH_DESIGN → Technology choices and tradeoffs](./TECH_DESIGN.md#technology-choices-and-tradeoffs).
+
+| Component | Choice | Why this choice |
+|---|---|---|
+| LLM gateway | **OpenRouter** | The challenge requires a gateway, not a raw provider; OpenRouter is one key and swappable models with minimal code. |
+| LLM | strong general model via OpenRouter (configurable) | The gateway makes the model swappable, so we tune cost vs quality during evals. |
+| Agent orchestration | **LangGraph** | Purpose-built for an agent that reasons, routes to tools, and carries memory. |
+| Tools | status-query, brief-retriever, openFDA-recall, Federal-Register-ban | They realise the three lanes; the two government APIs are the required external search. |
+| Embedding model | **bge-small-en-v1.5**, local (Apple Silicon / MPS) | Tiny corpus, so a small local model is free, fast, and needs no external API. |
+| Vector database | **Chroma** (local file) | Simplest possible store for a small corpus; nothing to run or host. |
+| Monitoring | **LangSmith** | Traces every agent step and retrieval to debug and to back the eval story. |
+| Evaluation framework | **RAGAS** + LLM-as-judge | RAGAS scores retrieval; the judge scores whether the answer is correct, grounded, and safe. |
+| User interface | **Streamlit** | One Python file gives a chat UI that runs in a phone and laptop browser. |
+| Deployment | **Streamlit Community Cloud** | Free public URL: satisfies the public-endpoint and phone requirements at once. |
+| Structured store | **DuckDB** | A lightweight local database for the additive and status tables (already built). |
+
+The system, wired together:
 
 ```mermaid
 flowchart LR
@@ -144,11 +160,11 @@ flowchart TD
 
 ---
 
-## Task 3 — Dealing with the Data
+## Task 3: Dealing with the Data
 
 ### 3.1 Chunking strategy
 
-**One brief per additive, split on its labelled sections** (identity / regulatory status / evidence). Chosen over fixed-size chunks because user questions map onto those sections (status vs evidence), so each retrieved chunk is self-contained and keeps its citation intact; the corpus is small enough that this stays simple. Full rationale in [`PLAN.md` Part 4](../PLAN.md#chunking-strategy-and-why).
+**One brief per additive, split on its labelled sections** (identity / regulatory status / evidence). Chosen over fixed-size chunks because user questions map onto those sections (status vs evidence), so each retrieved chunk is self-contained and keeps its citation intact; the corpus is small enough that this stays simple. Full rationale in [TECH_DESIGN → Chunking](./TECH_DESIGN.md#chunking-for-the-rag-briefs).
 
 ### 3.2 Data source and external API
 
@@ -158,45 +174,45 @@ flowchart TD
 
 ---
 
-## Task 4 — End-to-End Agentic RAG Prototype
+## Task 4: End-to-End Agentic RAG Prototype
 
 ### 4.1 End-to-end prototype
-_TODO — link to the app entrypoint and a short description once built._
+_TODO: link to the app entrypoint and a short description once built._
 
 ### 4.2 Public deployment
-_TODO — public Streamlit Community Cloud URL._
+_TODO: public Streamlit Community Cloud URL._
 
 ---
 
-## Task 5 — Evals
+## Task 5: Evals
 
 ### 5.1 Test dataset
-_TODO — describe `evals/gold.jsonl`: size, how questions were chosen, ground-truth source (the curated cited status rows)._
+_TODO: describe `evals/gold.jsonl`: size, how questions were chosen, ground-truth source (the curated cited status rows)._
 
 ### 5.2 Evaluation harness
-_TODO — RAGAS retrieval metrics + LLM-as-judge for correctness / groundedness / safety; how to run it._
+_TODO: RAGAS retrieval metrics + LLM-as-judge for correctness / groundedness / safety; how to run it._
 
 ### 5.3 Conclusions
-_TODO — what the baseline numbers say about the pipeline._
+_TODO: what the baseline numbers say about the pipeline._
 
 ---
 
-## Task 6 — Improving the Prototype
+## Task 6: Improving the Prototype
 
 ### 6.1 Advanced retriever
-_TODO — reranker (bge-reranker); 1–2 sentences on why it should help (separating near-identical briefs)._
+_TODO: reranker (bge-reranker); 1-2 sentences on why it should help (separating near-identical briefs)._
 
 ### 6.2 Before/after results
-_TODO — table: baseline vs reranker on the gold set._
+_TODO: table: baseline vs reranker on the gold set._
 
 ### 6.3 Second improvement
-_TODO — hybrid BM25 + dense retrieval; table showing the measured gain._
+_TODO: hybrid BM25 + dense retrieval; table showing the measured gain._
 
 ---
 
-## Task 7 — Next Steps
+## Task 7: Next Steps
 
-_TODO — what to keep for Demo Day (the CAS join, the brief corpus, the safety boundary) and what to expand (full status matrix via the bulk loaders, more product categories, richer memory), with reasoning._
+_TODO: what to keep for Demo Day (the CAS join, the brief corpus, the safety boundary) and what to expand (full status matrix via the bulk loaders, more product categories, richer memory), with reasoning._
 
 ---
 
