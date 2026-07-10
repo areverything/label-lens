@@ -32,15 +32,12 @@ OFF_V2_PRODUCT = "https://world.openfoodfacts.org/api/v2/product/{barcode}.json"
 # OFF additive tags for the slice, e.g. "en:e171", to filter products by.
 SLICE_ADDITIVE_TAGS = tuple(f"en:{e.e_number.lower()}" for e in SLICE)
 
-# Category-tag substrings that mark a product as candy/confectionery.
-_CANDY_KEYWORDS = ("candie", "confection", "sweet-snack", "chewing-gum",
-                   "marshmallow", "lollipop", "gumm")
+# US candy/confectionery category names queried server-side. Filtering by category
+# is a query shape the Search API handles reliably (filtering by additive 503s under
+# load); we then keep the products that carry a slice additive.
+CANDY_CATEGORIES = ("Candies", "Confectioneries", "Chewing gum", "Marshmallows")
 
 _FIELDS = "code,product_name,brands,categories_tags,countries_tags,additives_tags,ingredients_text"
-
-
-def _is_candy(categories_tags: list[str] | None) -> bool:
-    return any(k in c for c in (categories_tags or []) for k in _CANDY_KEYWORDS)
 
 
 def _row(p: dict) -> tuple:
@@ -73,24 +70,24 @@ def _get_json(client: httpx.Client, params: dict, tries: int = 4) -> dict:
     return {}
 
 
-def search_candy_products(total: int = 400, per_additive: int = 60,
-                          pages: int = 3, page_size: int = 50,
-                          throttle_s: float = 7.0) -> list[tuple]:
+def search_candy_products(total: int = 400, pages: int = 12,
+                          page_size: int = 50, throttle_s: float = 4.0) -> list[tuple]:
     """Collect US candy products carrying a slice additive, via the Search API.
 
-    Queries per additive (US + that additive), keeps the candy ones, dedupes by
-    barcode. Throttled to respect the Search API rate limit (~10 req/min).
+    Pages US products by candy category (the reliable query shape), keeps the ones
+    carrying at least one slice additive, dedupes by barcode. Throttled for the
+    Search API rate limit.
     """
+    slice_tags = set(SLICE_ADDITIVE_TAGS)
     seen: dict[str, tuple] = {}
     with httpx.Client(headers={"User-Agent": USER_AGENT}, timeout=60) as c:
-        for tag in SLICE_ADDITIVE_TAGS:
-            kept_for_tag = 0
+        for cat in CANDY_CATEGORIES:
             for page in range(1, pages + 1):
-                if len(seen) >= total or kept_for_tag >= per_additive:
+                if len(seen) >= total:
                     break
                 products = _get_json(c, {
                     "countries_tags_en": "United States",
-                    "additives_tags": tag,
+                    "categories_tags_en": cat,
                     "fields": _FIELDS,
                     "page_size": page_size,
                     "page": page,
@@ -98,12 +95,12 @@ def search_candy_products(total: int = 400, per_additive: int = 60,
                 if not products:
                     break
                 for p in products:
-                    if not p.get("code") or not _is_candy(p.get("categories_tags")):
+                    code = p.get("code")
+                    if not code or code in seen:
                         continue
-                    if p["code"] not in seen:
-                        seen[p["code"]] = _row(p)
-                        kept_for_tag += 1
-                        if len(seen) >= total or kept_for_tag >= per_additive:
+                    if slice_tags.intersection(p.get("additives_tags") or []):
+                        seen[code] = _row(p)
+                        if len(seen) >= total:
                             break
                 time.sleep(throttle_s)
             if len(seen) >= total:

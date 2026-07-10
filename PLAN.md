@@ -4,9 +4,7 @@ Where the project stands and what's built next, in dependency order. For *how an
 
 ## Where we are
 
-**Built:** the CAS store (28 additives resolved to CAS + 32 cited regulatory-status rows) and the **28-brief RAG corpus** in `data/briefs/` (faithful, committed). The OpenRouter gateway works. See the [Quick Start](./README.md#quick-start).
-
-**Pending an upstream outage:** the US-candy product load. Open Food Facts (search API 503) and its Hugging Face mirror (429) were both down; the loader is verified correct. Re-run when they recover: `uv run python scripts/load_products.py 400`.
+**Built:** the CAS store (28 additives resolved to CAS + 32 cited regulatory-status rows), the **28-brief RAG corpus** in `data/briefs/` (committed), and **100 US candy products** in the `product` table, linked to the slice additives. The OpenRouter gateway works. See the [Quick Start](./README.md#quick-start).
 
 **Partial:** regulatory-status coverage is 15 of 28 additives; the other briefs honestly say "not yet compiled" per jurisdiction.
 
@@ -15,10 +13,9 @@ Where the project stands and what's built next, in dependency order. For *how an
 ### Next session: start here
 
 1. **(quick, 5 pts)** Tighten SUBMISSION §3.2 to enumerate **all** data sources (Open Food Facts, Wikidata, curated regulator citations, EFSA) and both live APIs (openFDA, Federal Register).
-2. **Retry the product load** (command above) if Open Food Facts is back up.
-3. Then **Milestone 2** (retrieval + agent), or first close the status-coverage gap with the bulk loaders. Milestones below.
+2. **Milestone 2** (retrieval + agent), or first close the status-coverage gap with the bulk loaders. Milestones below.
 
-Config note: the OpenRouter key is already in `.env.local` (gitignored, stays on this machine). Rebuild briefs anytime with `uv run python scripts/build_briefs.py`.
+Notes for a fresh clone: the DuckDB store (`data/label_lens.duckdb`) is local and gitignored, so rebuild it with `build_spine.py` then `load_products.py` then `build_briefs.py`. Open Food Facts' API is intermittently flaky (503); the loader uses the reliable category-based query and retries, but a small batch (`load_products.py 100`) is more likely to slip through than 400. The OpenRouter key is in `.env.local` (gitignored, stays on this machine).
 
 ## The plan
 
@@ -26,7 +23,7 @@ Five milestones in dependency order (each one needs the previous). No dates: thi
 
 ### Milestone 1: Data and briefs
 
-**Status: mostly done.** Briefs built (28); product load pending the OFF outage; status coverage 15/28.
+**Status: mostly done.** Briefs built (28); 100 US candy products loaded; status coverage 15/28.
 
 **Goal:** turn the CAS spine into the knowledge the assistant reasons over.
 
