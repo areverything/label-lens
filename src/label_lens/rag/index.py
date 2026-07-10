@@ -67,3 +67,15 @@ def load_index(persist_dir: Path = CHROMA_DIR) -> Chroma:
         embedding_function=get_embeddings(),
         persist_directory=str(persist_dir),
     )
+
+
+def ensure_index(persist_dir: Path = CHROMA_DIR) -> Chroma:
+    """Load the index, building it once if it does not exist yet.
+
+    Used at app startup on a fresh host (the index is gitignored, so a deployed
+    clone rebuilds it once from the committed briefs). Cheap: no LLM, just the
+    embedding model that is loaded for queries anyway.
+    """
+    if persist_dir.exists():
+        return load_index(persist_dir)
+    return build_index(persist_dir=persist_dir)

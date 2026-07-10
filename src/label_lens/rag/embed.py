@@ -1,32 +1,20 @@
-"""Local bge-small embeddings, on Apple Silicon (MPS) when available.
+"""Local bge-small embeddings via fastembed (ONNX runtime).
 
-Small corpus, so a tiny local model is free, fast, and needs no external API.
-Normalised vectors so cosine similarity is a plain dot product.
+Same model as before (BAAI/bge-small-en-v1.5), run through ONNX rather than
+torch: no torch/CUDA dependency, a small install, and fast CPU inference. Small
+corpus, so this is free, offline-capable, and light enough for a memory-limited
+deploy host. fastembed L2-normalises its output, so cosine similarity is a plain
+dot product.
 """
 from __future__ import annotations
 
 from functools import lru_cache
 
-from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_community.embeddings import FastEmbedEmbeddings
 
 MODEL_NAME = "BAAI/bge-small-en-v1.5"
 
 
-def _device() -> str:
-    try:
-        import torch
-
-        if torch.backends.mps.is_available():
-            return "mps"
-    except Exception:
-        pass
-    return "cpu"
-
-
 @lru_cache(maxsize=1)
-def get_embeddings() -> HuggingFaceEmbeddings:
-    return HuggingFaceEmbeddings(
-        model_name=MODEL_NAME,
-        model_kwargs={"device": _device()},
-        encode_kwargs={"normalize_embeddings": True},
-    )
+def get_embeddings() -> FastEmbedEmbeddings:
+    return FastEmbedEmbeddings(model_name=MODEL_NAME)

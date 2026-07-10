@@ -10,15 +10,34 @@ Entry point for Streamlit Community Cloud (auto-detected at the repo root).
 """
 from __future__ import annotations
 
+import os
 import uuid
 
 import streamlit as st
 
-from label_lens.agent import memory
-from label_lens.agent.graph import answer
-from label_lens.agent.tools import _con
+# On Streamlit Community Cloud the secret lives in st.secrets, not .env.local.
+# Bridge it into the environment the agent reads before importing the agent.
+# Accessing st.secrets with no secrets file raises, so guard it (local dev).
+try:
+    for _k in ("OPENROUTER_API_KEY", "OPENROUTER_MODEL", "LANGSMITH_API_KEY"):
+        if _k in st.secrets and not os.getenv(_k):
+            os.environ[_k] = str(st.secrets[_k])
+except Exception:
+    pass
+
+from label_lens.agent import memory  # noqa: E402
+from label_lens.agent.graph import answer  # noqa: E402
+from label_lens.agent.tools import _con  # noqa: E402
+from label_lens.rag.index import ensure_index  # noqa: E402
 
 st.set_page_config(page_title="Label Lens", page_icon="🔎", layout="centered")
+
+
+@st.cache_resource(show_spinner="Building the brief index (first load only)...")
+def _warm() -> bool:
+    """Build the Chroma index once per host if it is missing (deployed clones)."""
+    ensure_index()
+    return True
 
 EXAMPLES = [
     "Is E171 (titanium dioxide) banned in the EU?",
@@ -78,6 +97,7 @@ def sidebar() -> None:
 
 
 def main() -> None:
+    _warm()
     st.title("🔎 Label Lens")
     st.caption(
         "Ask about a food additive or a product. Answers are cited from regulators "
