@@ -25,7 +25,10 @@ _SYSTEM = (
     "with its citation in parentheses, taken from the facts. Never invent facts, numbers, "
     "or citations. Keep three things separate and never conflate them: a jurisdiction's "
     "LEGAL status (banned/permitted), a cancer-HAZARD classification (e.g. IARC group), "
-    "and personal HARM. Do not give medical advice. If evidence is thin, say so plainly."
+    "and personal HARM. Do not give medical advice. If evidence is thin, say so plainly. "
+    "If no status is provided for a jurisdiction, state that it is not yet compiled; never "
+    "infer permitted, banned, or safe from missing data. Only describe regulatory "
+    "divergence when the provided statuses actually differ."
 )
 
 
@@ -65,7 +68,8 @@ def _facts_block(f: Facts) -> str:
             f"{r['status']} - {r['detail']} ({r['citation']})" for r in f.status]
     ev = []
     if f.efsa_adi:
-        ev.append(f"- EFSA acceptable daily intake: {f.efsa_adi} (EFSA re-evaluation, {f.efsa_url or 'EFSA'})")
+        ev.append(f"- EFSA acceptable daily intake (ADI): {f.efsa_adi} mg/kg body weight per day "
+                  f"(EFSA re-evaluation, {f.efsa_url or 'EFSA'})")
     if f.efsa_url and not f.efsa_adi:
         ev.append(f"- EFSA re-evaluation on record ({f.efsa_url})")
     return (f"Additive: {f.name} ({f.e_number}, CAS {f.cas}), family {f.family}.\n"
@@ -76,10 +80,13 @@ def _facts_block(f: Facts) -> str:
 def _narrative(f: Facts, *, model: str | None = None) -> str:
     user = (
         _facts_block(f) + "\n\n"
-        "Write two short paragraphs, citing each claim from the facts above:\n"
-        "1. How regulators diverge on this additive and (if the facts say) why.\n"
-        "2. What the safety evidence says (EFSA intake, IARC classification if any), "
-        "making clear that 'banned somewhere' is not the same as 'proven harmful'."
+        "Write two short paragraphs. Cite each claim with the citation from the facts.\n"
+        "1. Regulatory status across jurisdictions. If the statuses genuinely differ, "
+        "explain the divergence; if they agree, say so; for any jurisdiction with no row, "
+        "say the status is not yet compiled and do NOT infer one.\n"
+        "2. What the safety evidence says (EFSA ADI, IARC classification if any), making "
+        "clear that 'banned somewhere' or a hazard classification is not the same as "
+        "'proven harmful'. If a fact is not provided, do not state it."
     )
     return llm.chat([{"role": "system", "content": _SYSTEM},
                      {"role": "user", "content": user}], model=model)
