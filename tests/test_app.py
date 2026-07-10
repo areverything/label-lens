@@ -53,3 +53,26 @@ def test_chat_input_produces_a_cited_answer():
     replies = [m.value for m in at.chat_message if CANNED in getattr(m, "value", "")]
     # The assistant markdown should carry the (stubbed) cited answer.
     assert any(CANNED in md.value for md in at.markdown)
+
+
+EX0 = "Is E171 (titanium dioxide) banned in the EU?"
+
+
+def test_clicking_an_example_chip_answers_that_question():
+    at = AppTest.from_file(APP).run(timeout=30)
+    assert EX0 in [b.label for b in at.button]  # chip shown on the empty state
+    at.button(key="ex0").click().run(timeout=30)
+    assert not at.exception
+    assert at.session_state["messages"][0] == {"role": "user", "content": EX0}
+    assert any(CANNED in md.value for md in at.markdown)
+
+
+def test_example_chips_do_not_linger_after_answering():
+    """Regression: chips rendered before the answer was appended lingered one
+    render, then swallowed the next click and re-showed the old Q&A."""
+    at = AppTest.from_file(APP).run(timeout=30)
+    at.button(key="ex0").click().run(timeout=30)
+    assert not at.exception
+    # Once a question is answered, the starter chips must be gone, so a later
+    # click cannot land on a stale button whose handler no longer runs.
+    assert EX0 not in [b.label for b in at.button]
