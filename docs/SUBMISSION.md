@@ -135,18 +135,46 @@ flowchart TD
 
 **One brief per additive, split on its labelled sections** (identity / regulatory status / evidence). Chosen over fixed-size chunks because user questions map onto those sections (status vs evidence), so each retrieved chunk is self-contained and keeps its citation intact; the corpus is small enough that this stays simple. Full rationale in [TECH_DESIGN → Chunking](./TECH_DESIGN.md#chunking-for-the-rag-briefs).
 
-### 3.2 Data source and external API
+### 3.2 Data sources and external APIs
 
-- **Our own data (RAG):** distilled per-additive briefs built on the CAS spine (Open Food Facts taxonomy for names/codes + Wikidata for CAS + curated cited regulatory status). Role: the knowledge the assistant reasons over.
-- **External API (agentic search of public data):** openFDA food-enforcement (recalls) and the Federal Register (new bans/revocations). Role: keep answers current with live regulator actions.
-- **How they interact:** the agent answers stable "what's the status / why" questions from the briefs (RAG) and reaches for the live APIs when a question is about *right now* (a recall or a recent ban), then merges both into one cited answer.
+**Our own data.** The assistant reasons over a CAS-keyed spine (each additive resolved to its CAS registry number, the join key that reconciles regulators who name additives differently) and a per-additive brief distilled from it. That data is assembled from four sources:
+
+| Source | What it supplies | Used by |
+|---|---|---|
+| **Open Food Facts** | Additive taxonomy (names ↔ E-numbers) and the 100 US candy products in the `product` table | Store + product lookup |
+| **Wikidata** | CAS registry numbers per additive (the cross-regulator join key) | Store (spine) |
+| **Curated, primary-source-cited regulatory status** | Hand-verified status rows from the regulators themselves: EU EUR-Lex (Reg (EC) 1333/2008), US FDA (21 CFR + Federal Register), California (AB 418, Prop 65), IARC monographs | Store + RAG |
+| **EFSA scientific opinions** | The safety-evidence citations in each brief's evidence section (e.g. the 2021 titanium dioxide genotoxicity opinion behind the EU ban) | RAG |
+
+The briefs (one per additive, chunked on identity / regulatory status / evidence) are the RAG corpus; the same status rows live in DuckDB as the structured Store lane. Every claim carries its citation.
+
+**External APIs (live, agentic search of public data).** Two US government endpoints keep answers current with actions the briefs cannot pre-bake:
+
+- **openFDA food-enforcement** — product recalls.
+- **Federal Register** — new bans and authorization revocations.
+
+**How they interact.** The agent answers stable "what's the status / why" questions from the Store and the briefs (RAG), and reaches for the live APIs when a question is about *right now* (a recall or a recent ban), then merges the results into one cited answer.
 
 ---
 
 ## Task 4: End-to-End Agentic RAG Prototype
 
 ### 4.1 End-to-end prototype
-_TODO: link to the app entrypoint and a short description once built._
+
+Built and runnable locally. Entrypoint: [`scripts/ask.py`](../scripts/ask.py) → the agent in [`src/label_lens/agent/graph.py`](../src/label_lens/agent/graph.py).
+
+```bash
+uv run python scripts/ask.py "Why did the EU ban titanium dioxide, and does that mean it's dangerous?"
+```
+
+The agent is a LangGraph ReAct loop over four tools, one per lane ([`agent/tools.py`](../src/label_lens/agent/tools.py)):
+
+- **additive_status** — DuckDB legal-status lookup (Store).
+- **search_briefs** — dense retrieval over the Chroma brief index (RAG).
+- **check_recalls** — live openFDA food-enforcement call (Live).
+- **recent_regulatory_actions** — live Federal Register call (Live).
+
+Before routing, it reads the user's memory (diet/allergy profile + logged products) and folds the logged products' *real* additives, joined from the `product` table, into the prompt, so cumulative questions are grounded in the store rather than guessed. Every model call goes through the OpenRouter gateway; the safety boundary (legal ≠ hazard ≠ harm, no medical verdict) is enforced in the system prompt. All six evaluation question types in [§1.4](#14-questions-we-evaluate-against) return cited answers; runs are traced in LangSmith when a key is set.
 
 ### 4.2 Public deployment
 _TODO: public Streamlit Community Cloud URL._

@@ -43,3 +43,21 @@ CREATE TABLE IF NOT EXISTS product (
     ingredients_text TEXT,
     off_url          TEXT
 );
+
+-- User memory: one diet/allergy profile row per user, plus an append-only log of
+-- products they asked about. Powers cumulative, personalised questions. Also
+-- created on demand by agent/memory.py so an existing store gains them in place.
+CREATE TABLE IF NOT EXISTS user_profile (
+    user_id    TEXT PRIMARY KEY,
+    diet       TEXT,
+    allergies  TEXT,
+    updated_at TEXT
+);
+CREATE SEQUENCE IF NOT EXISTS product_log_seq START 1;
+CREATE TABLE IF NOT EXISTS product_log (
+    id        BIGINT DEFAULT nextval('product_log_seq') PRIMARY KEY,
+    user_id   TEXT NOT NULL,
+    barcode   TEXT,
+    name      TEXT,
+    logged_at TEXT
+);

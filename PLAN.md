@@ -4,18 +4,19 @@ Where the project stands and what's built next, in dependency order. For *how an
 
 ## Where we are
 
-**Built:** the CAS store (28 additives resolved to CAS + 32 cited regulatory-status rows), the **28-brief RAG corpus** in `data/briefs/` (committed), and **100 US candy products** in the `product` table, linked to the slice additives. The OpenRouter gateway works. See the [Quick Start](./README.md#quick-start).
+**Built:** the CAS store (28 additives resolved to CAS + 32 cited regulatory-status rows), the **28-brief RAG corpus** in `data/briefs/` (committed), **100 US candy products** in the `product` table, the **Chroma vector index** over the briefs, and the **working LangGraph agent**: four tools (Store / RAG / openFDA / Federal Register) + user memory, every model call through OpenRouter, LangSmith tracing when a key is set. All six eval question types return cited answers locally. See the [Quick Start](./README.md#quick-start).
 
 **Partial:** regulatory-status coverage is 15 of 28 additives; the other briefs honestly say "not yet compiled" per jurisdiction.
 
-**Not yet built:** the vector index, the LangGraph agent and its tools, the user memory, the Streamlit UI, the public deployment, and the evaluation harness.
+**Not yet built:** the Streamlit UI, the public deployment, and the evaluation harness.
 
 ### Next session: start here
 
-1. **(quick, 5 pts)** Tighten SUBMISSION §3.2 to enumerate **all** data sources (Open Food Facts, Wikidata, curated regulator citations, EFSA) and both live APIs (openFDA, Federal Register).
-2. **Milestone 2** (retrieval + agent), or first close the status-coverage gap with the bulk loaders. Milestones below.
+1. **Milestone 3** (Streamlit UI + public deployment): closes the rest of Task 4 (front end + public URL, 15 pts) and the phone/laptop-browser requirement. Small effort.
+2. **Milestone 4** (evals): the biggest remaining point block (Task 5 = 15 pts, Task 6 = 14 pts). Build the gold set from the curated status rows, then the RAGAS + LLM-judge harness, then the reranker and hybrid before/after tables.
+3. Optional, lower priority: close the status-coverage gap with the bulk loaders (`fda/eu/iarc/prop65`) so all 28 additives have a full status matrix.
 
-Notes for a fresh clone: the DuckDB store (`data/label_lens.duckdb`) is local and gitignored, so rebuild it with `build_spine.py` then `load_products.py` then `build_briefs.py`. Open Food Facts' API is intermittently flaky (503); the loader uses the reliable category-based query and retries, but a small batch (`load_products.py 100`) is more likely to slip through than 400. The OpenRouter key is in `.env.local` (gitignored, stays on this machine).
+Notes for a fresh clone: the DuckDB store (`data/label_lens.duckdb`) and the Chroma index (`data/chroma/`) are local and gitignored, so rebuild them with `build_spine.py` then `load_products.py` then `build_briefs.py` then `build_index.py`. Open Food Facts' API is intermittently flaky (503); the loader uses the reliable category-based query and retries, but a small batch (`load_products.py 100`) is more likely to slip through than 400. The OpenRouter key is in `.env.local` (gitignored, stays on this machine).
 
 ## The plan
 
@@ -36,6 +37,8 @@ Five milestones in dependency order (each one needs the previous). No dates: thi
 **Done when:** every in-scope additive has a brief, and a hand spot-check confirms its claims are cited and correct.
 
 ### Milestone 2: Retrieval and the agent
+
+**Status: done.** Chroma index over the 84 brief chunks; LangGraph agent with the four tools + memory; every model call through OpenRouter; all six eval question types return cited answers locally, the cumulative question grounded in the real product→additive join.
 
 **Goal:** a working end-to-end agent, running on the laptop.
 
