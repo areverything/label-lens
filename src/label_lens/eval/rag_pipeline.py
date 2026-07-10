@@ -6,7 +6,7 @@ faithfulness are attributable to the retriever and prompt, not to a tool call.
 """
 from __future__ import annotations
 
-from label_lens.eval.corpus import load_corpus
+from label_lens.eval.corpus import by_id
 from label_lens.eval.retrievers import dense
 from label_lens.llm import chat
 
@@ -17,8 +17,8 @@ give medical advice."""
 
 
 def _contexts(question: str, k: int, retriever=dense) -> list[str]:
-    by_id = {d.chunk_id: d for d in load_corpus()}
-    return [by_id[cid].text for cid in retriever(question, k=k) if cid in by_id]
+    docs = by_id()
+    return [docs[cid].text for cid in retriever(question, k=k) if cid in docs]
 
 
 def rag_answer(question: str, k: int = 4, retriever=dense) -> tuple[str, list[str]]:
