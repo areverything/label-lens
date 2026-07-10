@@ -16,7 +16,18 @@ Why it's hard: each regulator names additives differently (Europe uses an **E-nu
 cd ~/code/courses/label_lens
 uv sync                                   # install dependencies (Python 3.13 via uv)
 uv run python scripts/build_spine.py      # build the additive database -> data/label_lens.duckdb
+uv run python scripts/load_products.py    # load US candy products from Open Food Facts
+uv run python scripts/build_briefs.py     # generate the per-additive briefs (needs the LLM key)
+uv run python scripts/build_index.py      # embed the briefs into the Chroma vector index
 ```
+
+Then ask the agent a question (needs `OPENROUTER_API_KEY` in `.env.local`):
+
+```bash
+uv run python scripts/ask.py "Why did the EU ban titanium dioxide, and does that mean it's dangerous?"
+```
+
+The agent routes each question to the right lane: a **Store** lookup (DuckDB) for legal facts, **RAG** over the briefs for evidence, or a **live** government API (openFDA recalls, Federal Register bans). It cites every claim and refuses medical verdicts. Set a LangSmith key (`LANGSMITH_API_KEY`) to see each run traced.
 
 This builds a table of additives (each linked to its CAS number) plus their legal status per region, and prints a coverage report. Query it:
 

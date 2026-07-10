@@ -160,7 +160,21 @@ The briefs (one per additive, chunked on identity / regulatory status / evidence
 ## Task 4: End-to-End Agentic RAG Prototype
 
 ### 4.1 End-to-end prototype
-_TODO: link to the app entrypoint and a short description once built._
+
+Built and runnable locally. Entrypoint: [`scripts/ask.py`](../scripts/ask.py) → the agent in [`src/label_lens/agent/graph.py`](../src/label_lens/agent/graph.py).
+
+```bash
+uv run python scripts/ask.py "Why did the EU ban titanium dioxide, and does that mean it's dangerous?"
+```
+
+The agent is a LangGraph ReAct loop over four tools, one per lane ([`agent/tools.py`](../src/label_lens/agent/tools.py)):
+
+- **additive_status** — DuckDB legal-status lookup (Store).
+- **search_briefs** — dense retrieval over the Chroma brief index (RAG).
+- **check_recalls** — live openFDA food-enforcement call (Live).
+- **recent_regulatory_actions** — live Federal Register call (Live).
+
+Before routing, it reads the user's memory (diet/allergy profile + logged products) and folds the logged products' *real* additives, joined from the `product` table, into the prompt, so cumulative questions are grounded in the store rather than guessed. Every model call goes through the OpenRouter gateway; the safety boundary (legal ≠ hazard ≠ harm, no medical verdict) is enforced in the system prompt. All six evaluation question types in [§1.4](#14-questions-we-evaluate-against) return cited answers; runs are traced in LangSmith when a key is set.
 
 ### 4.2 Public deployment
 _TODO: public Streamlit Community Cloud URL._

@@ -57,9 +57,9 @@ Every scored deliverable, its points, where it's answered in [SUBMISSION.md](./S
 | 2 | 1 | Solution in one sentence | [§2.1](./SUBMISSION.md#21-the-solution-one-sentence) | 🔨 |
 | 2 | 7 | Infra diagram + one-line why per component | [§2.2](./SUBMISSION.md#22-infrastructure) | 🔨 |
 | 2 | 7 | Agent-workflow diagram + 1-2 paragraphs | [§2.3](./SUBMISSION.md#23-agent-workflow) | 🔨 |
-| 3 | 5 | All data sources + external APIs + their use | [§3.2](./SUBMISSION.md#32-data-source-and-external-api) | 🔨 |
-| 3 | 5 | Default chunking strategy + why | [§3.1](./SUBMISSION.md#31-chunking-strategy) | 🔨 |
-| 4 | 15 | End-to-end prototype + deploy with a front end | [§4](./SUBMISSION.md#task-4-end-to-end-agentic-rag-prototype) | ☐ |
+| 3 | 5 | All data sources + external APIs + their use | [§3.2](./SUBMISSION.md#32-data-sources-and-external-apis) | ✅ |
+| 3 | 5 | Default chunking strategy + why | [§3.1](./SUBMISSION.md#31-chunking-strategy) | ✅ |
+| 4 | 15 | End-to-end prototype + deploy with a front end | [§4](./SUBMISSION.md#task-4-end-to-end-agentic-rag-prototype) | 🔨 |
 | 5 | 2 | Test dataset | [§5.1](./SUBMISSION.md#51-test-dataset) | ☐ |
 | 5 | 10 | Evaluation harness | [§5.2](./SUBMISSION.md#52-evaluation-harness) | ☐ |
 | 5 | 3 | Conclusions on performance | [§5.3](./SUBMISSION.md#53-conclusions) | ☐ |
@@ -71,16 +71,16 @@ Every scored deliverable, its points, where it's answered in [SUBMISSION.md](./S
 | Final | 10 | Written document answering every deliverable | [SUBMISSION.md](./SUBMISSION.md) | 🔨 |
 | Final | 0 | All relevant code | the repository | 🔨 |
 
-> Status so far: the CAS store and the 28-brief RAG corpus are **built**; Task 1-3 answers are **drafted** in SUBMISSION.md; Task 4-7 depend on the agent, UI, deployment, and eval harness still to build. Known content gap: §3.2 should enumerate **all** data sources + external APIs in one place.
+> Status so far: the CAS store, the 28-brief RAG corpus, the Chroma index, and the **working LangGraph agent** (four tools + memory, running through OpenRouter) are **built**; all six eval question types return cited answers locally. Task 1-3 answers are drafted in SUBMISSION.md. Task 4 remains open on the front end + public deployment (Milestone 3); Task 5-7 depend on the eval harness still to build.
 
 ## Cross-cutting requirements
 
 Not separate rubric lines, but required across the build (mostly folded into Task 4). Missing any of these puts scored tasks at risk.
 
-- **LLM gateway** (OpenRouter): done (`src/label_lens/llm.py`).
-- **Own data for RAG**: done (the 28 per-additive briefs in `data/briefs/`).
-- **External API / agentic search**: planned (openFDA recalls + Federal Register bans).
-- **Memory component**: planned (user diet/allergy profile + product log, Milestone 2).
+- **LLM gateway** (OpenRouter): done (`src/label_lens/llm.py`; the agent routes through it via `agent/graph.py`).
+- **Own data for RAG**: done (the 28 per-additive briefs in `data/briefs/`, embedded into Chroma).
+- **External API / agentic search**: done (openFDA recalls + Federal Register bans, `agent/live.py`).
+- **Memory component**: done (user diet/allergy profile + product log, `agent/memory.py`).
 - **Runs in a phone and laptop browser**: planned (Streamlit, Milestone 3).
 - **Front end + public deployment**: planned (Streamlit Community Cloud, Milestone 3). Explicitly required by Task 4.
 
