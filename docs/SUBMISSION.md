@@ -8,32 +8,34 @@ This document answers **every deliverable and question** in the Certification Ch
 
 ## Coverage checklist
 
-One row per required deliverable. `✅` done · `🔨` in progress · `☐` not started. Click the section link to jump to the answer.
+Every scored deliverable, its point value, where it's answered, and its status. `✅` done · `🔨` drafted / in progress · `☐` not started. Point weights and the task-level scorecard live in [`RUBRIC.md`](./RUBRIC.md); this table owns per-deliverable status.
 
-| Task | Deliverable | Where | Status |
-|---|---|---|---|
-| 1 | 1-sentence problem (no solution) | [§1.1](#11-the-problem-one-sentence) | 🔨 |
-| 1 | Why it's a problem (who / what / today / gap) | [§1.2](#12-why-this-is-a-problem) | 🔨 |
-| 1 | Current-workflow diagram | [§1.3](#13-how-the-user-solves-this-today) | 🔨 |
-| 1 | Eval questions / input-output pairs | [§1.4](#14-questions-we-evaluate-against) | 🔨 |
-| 2 | Solution in one sentence | [§2.1](#21-the-solution-one-sentence) | 🔨 |
-| 2 | Infra diagram + one-line why per component | [§2.2](#22-infrastructure) | 🔨 |
-| 2 | Agent-workflow diagram + 1-2 paragraphs | [§2.3](#23-agent-workflow) | 🔨 |
-| 2 | Gateway + memory + phone/laptop browser | [§2.4](#24-required-capabilities) | 🔨 |
-| 3 | Chunking strategy + why | [§3.1](#31-chunking-strategy) | 🔨 |
-| 3 | Data source + external API + how they interact | [§3.2](#32-data-source-and-external-api) | 🔨 |
-| 4 | End-to-end prototype | [§4.1](#41-end-to-end-prototype) | ☐ |
-| 4 | Public deployment | [§4.2](#42-public-deployment) | ☐ |
-| 5 | Test dataset | [§5.1](#51-test-dataset) | ☐ |
-| 5 | Evaluation harness | [§5.2](#52-evaluation-harness) | ☐ |
-| 5 | Conclusions on performance | [§5.3](#53-conclusions) | ☐ |
-| 6 | Advanced retriever + why | [§6.1](#61-advanced-retriever) | ☐ |
-| 6 | Before/after comparison table | [§6.2](#62-beforeafter-results) | ☐ |
-| 6 | One other improvement + eval evidence | [§6.3](#63-second-improvement) | ☐ |
-| 7 | Keep/change reflection for Demo Day | [§7](#task-7-next-steps) | ☐ |
-| Final | Public repo + ≤10-min video + all code | top of this doc | ☐ |
+| Task | Pts | Deliverable | Where | Status |
+|---|--:|---|---|---|
+| 1 | 1 | 1-sentence problem (no solution) | [§1.1](#11-the-problem-one-sentence) | 🔨 |
+| 1 | 3 | Why it's a problem (who / what / today / gap) | [§1.2](#12-why-this-is-a-problem) | 🔨 |
+| 1 | 3 | Current-workflow diagram | [§1.3](#13-how-the-user-solves-this-today) | 🔨 |
+| 1 | 2 | Eval questions / input-output pairs | [§1.4](#14-questions-we-evaluate-against) | 🔨 |
+| 2 | 1 | Solution in one sentence | [§2.1](#21-the-solution-one-sentence) | 🔨 |
+| 2 | 7 | Infra diagram + one-line why per component | [§2.2](#22-infrastructure) | 🔨 |
+| 2 | 7 | Agent-workflow diagram + 1-2 paragraphs | [§2.3](#23-agent-workflow) | 🔨 |
+| 3 | 5 | All data sources + external APIs + their use | [§3.2](#32-data-source-and-external-api) | 🔨 |
+| 3 | 5 | Default chunking strategy + why | [§3.1](#31-chunking-strategy) | 🔨 |
+| 4 | 15 | End-to-end prototype + deploy with a front end | [§4](#task-4-end-to-end-agentic-rag-prototype) | ☐ |
+| 5 | 2 | Test dataset | [§5.1](#51-test-dataset) | ☐ |
+| 5 | 10 | Evaluation harness | [§5.2](#52-evaluation-harness) | ☐ |
+| 5 | 3 | Conclusions on performance | [§5.3](#53-conclusions) | ☐ |
+| 6 | 6 | Advanced retriever + why | [§6.1](#61-advanced-retriever) | ☐ |
+| 6 | 2 | Before/after comparison table | [§6.2](#62-beforeafter-results) | ☐ |
+| 6 | 6 | One other improvement + eval evidence | [§6.3](#63-second-improvement) | ☐ |
+| 7 | 2 | Keep/change reflection for Demo Day | [§7](#task-7-next-steps) | ☐ |
+| Final | 10 | 10-min-or-less Loom video (live demo + use case) | top of this doc | ☐ |
+| Final | 10 | Written document answering every deliverable | this document | 🔨 |
+| Final | 0 | All relevant code | the repository | 🔨 |
 
-> Status legend so far: the CAS spine and structured store (the Task 3 data foundation) are **built and working**; the sections marked 🔨 have a drafted answer that will be finalised as the app is built; `☐` sections depend on code not yet written.
+**Requirement (not separately scored, folded into Task 4):** the app must route through an LLM gateway, include a memory component, and run in a phone + laptop browser. See [§2.4](#24-required-capabilities) and [RUBRIC.md → Cross-cutting requirements](./RUBRIC.md#cross-cutting-requirements).
+
+> Status so far: the CAS store and the 28-brief RAG corpus are **built**; Task 1-3 answers are **drafted**; Task 4-7 depend on the agent, UI, deployment, and eval harness still to build. The scorecard view is in [RUBRIC.md](./RUBRIC.md#scorecard-task-level-tracking).
 
 ---
 
