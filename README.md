@@ -37,7 +37,7 @@ No API keys are needed to build the database. An LLM key (for the question-answe
 
 | Doc | What it's for |
 |---|---|
-| **[docs/SUBMISSION.md](./docs/SUBMISSION.md)** | The Certification Challenge write-up. Answers every graded deliverable, fronted by a coverage checklist. **Start here to review the project.** |
-| **[docs/RUBRIC.md](./docs/RUBRIC.md)** | The official grading rubric (100 points) and a task-level scorecard of how the submission is tracking. |
+| **[docs/RUBRIC.md](./docs/RUBRIC.md)** | The official grading rubric (100 points) and the coverage checklist: every deliverable, its points, where it's answered, and its status. **Start here to review coverage.** |
+| **[docs/SUBMISSION.md](./docs/SUBMISSION.md)** | The Certification Challenge write-up: the answer to every graded deliverable, one section per task. |
 | **[docs/TECH_DESIGN.md](./docs/TECH_DESIGN.md)** | How the system is built and why: architecture, the technology choices and their tradeoffs, and how the database is assembled. |
 | **[PLAN.md](./PLAN.md)** | Where the project stands and what's next, in build order. |

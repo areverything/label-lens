@@ -1,6 +1,6 @@
 # Label Lens: Roadmap & Status
 
-Where the project stands and what's built next, in dependency order. For *how and why* the system is designed, see [`docs/TECH_DESIGN.md`](./docs/TECH_DESIGN.md). For the certification deliverables and their per-item status, see the checklist in [`docs/SUBMISSION.md`](./docs/SUBMISSION.md).
+Where the project stands and what's built next, in dependency order. For *how and why* the system is designed, see [`docs/TECH_DESIGN.md`](./docs/TECH_DESIGN.md). For the certification deliverables and their per-item status, see the coverage checklist in [`docs/RUBRIC.md`](./docs/RUBRIC.md#coverage-checklist).
 
 ## Where we are
 
@@ -10,7 +10,7 @@ Where the project stands and what's built next, in dependency order. For *how an
 
 ## The plan
 
-Five milestones in dependency order (each one needs the previous). No dates: this is the build order, not a calendar. Every milestone lists its goal, what it produces, the certification deliverables it closes, and the concrete condition that means it's done. Per-deliverable status lives in the [coverage checklist](./docs/SUBMISSION.md#coverage-checklist).
+Five milestones in dependency order (each one needs the previous). No dates: this is the build order, not a calendar. Every milestone lists its goal, what it produces, the certification deliverables it closes, and the concrete condition that means it's done. Per-deliverable status lives in the [coverage checklist](./docs/RUBRIC.md#coverage-checklist).
 
 ### Milestone 1: Data and briefs
 

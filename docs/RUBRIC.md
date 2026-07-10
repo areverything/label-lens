@@ -2,7 +2,7 @@
 
 The official grading rubric this submission is scored against, ingested verbatim, plus a task-level scorecard of how we're tracking. **100 points total.** (Course guidance: 85+ passes; below that you're asked to revise up, not failed.)
 
-This doc is the **points reference and the scoring dashboard**. Deliverable-level status and the exact place each answer lives are tracked in the [coverage checklist in SUBMISSION.md](./SUBMISSION.md#coverage-checklist). Keep the two in sync: the checklist owns per-deliverable status, this doc owns the points and the task-level view.
+This doc is the **rubric and the coverage tracker**: the points reference plus the [coverage checklist](#coverage-checklist) below, which tracks where each deliverable is answered and its status. The answers themselves live in [SUBMISSION.md](./SUBMISSION.md).
 
 ## The rubric (verbatim)
 
@@ -44,20 +44,34 @@ This doc is the **points reference and the scoring dashboard**. Deliverable-leve
 | Final Submission | 20 |
 | **Total** | **100** |
 
-## Scorecard (task-level tracking)
+## Coverage checklist
 
-`done` = built and verified · `drafted` = written, will finalise · `not started`.
+Every scored deliverable, its points, where it's answered in [SUBMISSION.md](./SUBMISSION.md), and its status. `✅` done · `🔨` drafted / in progress · `☐` not started. This is the single tracker; SUBMISSION.md holds the answers themselves.
 
-| Task | Max | Status | Note |
-|---|--:|---|---|
-| 1 | 9 | drafted | Problem, why, current-workflow diagram, eval questions all written in SUBMISSION; refine to Arnaud's voice. |
-| 2 | 15 | drafted | Infra diagram + per-component why and the agent-workflow diagram are in SUBMISSION; will re-confirm once the app is built. |
-| 3 | 10 | in progress | Chunking documented; the 28-brief RAG corpus is built. Still to do: enumerate **all** data sources + external APIs in one place. |
-| 4 | 15 | not started | Needs the LangGraph agent, a Streamlit front end, and a public deployment. Highest single-task weight. |
-| 5 | 15 | not started | The eval harness alone is 10 points, the biggest single deliverable. |
-| 6 | 14 | not started | Reranker (6) + one other change (6) + comparison table (2), each measured. |
-| 7 | 2 | not started | Short keep/change reflection. |
-| Final | 20 | in progress | Written doc (10) is this repo's SUBMISSION.md, in progress; video (10) not started; code (0) accumulating. |
+| Task | Pts | Deliverable | Where | Status |
+|---|--:|---|---|---|
+| 1 | 1 | 1-sentence problem (no solution) | [§1.1](./SUBMISSION.md#11-the-problem-one-sentence) | 🔨 |
+| 1 | 3 | Why it's a problem (who / what / today / gap) | [§1.2](./SUBMISSION.md#12-why-this-is-a-problem) | 🔨 |
+| 1 | 3 | Current-workflow diagram | [§1.3](./SUBMISSION.md#13-how-the-user-solves-this-today) | 🔨 |
+| 1 | 2 | Eval questions / input-output pairs | [§1.4](./SUBMISSION.md#14-questions-we-evaluate-against) | 🔨 |
+| 2 | 1 | Solution in one sentence | [§2.1](./SUBMISSION.md#21-the-solution-one-sentence) | 🔨 |
+| 2 | 7 | Infra diagram + one-line why per component | [§2.2](./SUBMISSION.md#22-infrastructure) | 🔨 |
+| 2 | 7 | Agent-workflow diagram + 1-2 paragraphs | [§2.3](./SUBMISSION.md#23-agent-workflow) | 🔨 |
+| 3 | 5 | All data sources + external APIs + their use | [§3.2](./SUBMISSION.md#32-data-source-and-external-api) | 🔨 |
+| 3 | 5 | Default chunking strategy + why | [§3.1](./SUBMISSION.md#31-chunking-strategy) | 🔨 |
+| 4 | 15 | End-to-end prototype + deploy with a front end | [§4](./SUBMISSION.md#task-4-end-to-end-agentic-rag-prototype) | ☐ |
+| 5 | 2 | Test dataset | [§5.1](./SUBMISSION.md#51-test-dataset) | ☐ |
+| 5 | 10 | Evaluation harness | [§5.2](./SUBMISSION.md#52-evaluation-harness) | ☐ |
+| 5 | 3 | Conclusions on performance | [§5.3](./SUBMISSION.md#53-conclusions) | ☐ |
+| 6 | 6 | Advanced retriever + why | [§6.1](./SUBMISSION.md#61-advanced-retriever) | ☐ |
+| 6 | 2 | Before/after comparison table | [§6.2](./SUBMISSION.md#62-beforeafter-results) | ☐ |
+| 6 | 6 | One other improvement + eval evidence | [§6.3](./SUBMISSION.md#63-second-improvement) | ☐ |
+| 7 | 2 | Keep/change reflection for Demo Day | [§7](./SUBMISSION.md#task-7-next-steps) | ☐ |
+| Final | 10 | 10-min-or-less Loom video (live demo + use case) | [SUBMISSION.md top](./SUBMISSION.md) | ☐ |
+| Final | 10 | Written document answering every deliverable | [SUBMISSION.md](./SUBMISSION.md) | 🔨 |
+| Final | 0 | All relevant code | the repository | 🔨 |
+
+> Status so far: the CAS store and the 28-brief RAG corpus are **built**; Task 1-3 answers are **drafted** in SUBMISSION.md; Task 4-7 depend on the agent, UI, deployment, and eval harness still to build. Known content gap: §3.2 should enumerate **all** data sources + external APIs in one place.
 
 ## Cross-cutting requirements
 
