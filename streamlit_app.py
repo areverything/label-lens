@@ -11,7 +11,16 @@ Entry point for Streamlit Community Cloud (auto-detected at the repo root).
 from __future__ import annotations
 
 import os
+import sys
 import uuid
+from pathlib import Path
+
+# src/ layout: on Streamlit Community Cloud the app is run from the repo root and
+# our package is not pip-installed (requirements.txt has only third-party deps),
+# so make `import label_lens` resolve by putting src/ on the path.
+_SRC = Path(__file__).resolve().parent / "src"
+if _SRC.is_dir() and str(_SRC) not in sys.path:
+    sys.path.insert(0, str(_SRC))
 
 import streamlit as st
 
