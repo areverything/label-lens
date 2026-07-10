@@ -60,18 +60,18 @@ Every scored deliverable, its points, where it's answered in [SUBMISSION.md](./S
 | 3 | 5 | All data sources + external APIs + their use | [§3.2](./SUBMISSION.md#32-data-sources-and-external-apis) | ✅ |
 | 3 | 5 | Default chunking strategy + why | [§3.1](./SUBMISSION.md#31-chunking-strategy) | ✅ |
 | 4 | 15 | End-to-end prototype + deploy with a front end | [§4](./SUBMISSION.md#task-4-end-to-end-agentic-rag-prototype) | 🔨 |
-| 5 | 2 | Test dataset | [§5.1](./SUBMISSION.md#51-test-dataset) | ☐ |
-| 5 | 10 | Evaluation harness | [§5.2](./SUBMISSION.md#52-evaluation-harness) | ☐ |
-| 5 | 3 | Conclusions on performance | [§5.3](./SUBMISSION.md#53-conclusions) | ☐ |
-| 6 | 6 | Advanced retriever + why | [§6.1](./SUBMISSION.md#61-advanced-retriever) | ☐ |
-| 6 | 2 | Before/after comparison table | [§6.2](./SUBMISSION.md#62-beforeafter-results) | ☐ |
-| 6 | 6 | One other improvement + eval evidence | [§6.3](./SUBMISSION.md#63-second-improvement) | ☐ |
+| 5 | 2 | Test dataset | [§5.1](./SUBMISSION.md#51-test-dataset) | ✅ |
+| 5 | 10 | Evaluation harness | [§5.2](./SUBMISSION.md#52-evaluation-harness) | ✅ |
+| 5 | 3 | Conclusions on performance | [§5.3](./SUBMISSION.md#53-conclusions) | ✅ |
+| 6 | 6 | Advanced retriever + why | [§6.1](./SUBMISSION.md#61-advanced-retriever-cross-encoder-reranker) | ✅ |
+| 6 | 2 | Before/after comparison table | [§6.2](./SUBMISSION.md#62-beforeafter-results) | ✅ |
+| 6 | 6 | One other improvement + eval evidence | [§6.3](./SUBMISSION.md#63-second-improvement-hybrid-bm25--dense) | ✅ |
 | 7 | 2 | Keep/change reflection for Demo Day | [§7](./SUBMISSION.md#task-7-next-steps) | ☐ |
 | Final | 10 | 10-min-or-less Loom video (live demo + use case) | [SUBMISSION.md top](./SUBMISSION.md) | ☐ |
 | Final | 10 | Written document answering every deliverable | [SUBMISSION.md](./SUBMISSION.md) | 🔨 |
 | Final | 0 | All relevant code | the repository | 🔨 |
 
-> Status so far: the CAS store, the 28-brief RAG corpus, the Chroma index, the **working LangGraph agent** (four tools + memory, through OpenRouter), and the **Streamlit chat UI** are **built**; all six eval question types return cited answers locally. Task 1-3 answers are drafted in SUBMISSION.md. Task 4's front end is done; only the one-time public deploy (a Community Cloud login) remains. Task 5-7 depend on the eval harness still to build.
+> Status so far: the CAS store, the 28-brief RAG corpus, the Chroma index, the **working LangGraph agent** (four tools + memory, through OpenRouter), the **Streamlit chat UI**, and the **evaluation harness** (gold set + LLM-judge + RAGAS + retrieval before/after tables) are **built**. Tasks 1-3, 5, 6 are answered in SUBMISSION.md with recorded numbers. Task 4's front end is done; only the one-time public deploy (a Community Cloud login) remains. Task 7 (next-steps reflection) and the final video/repo items remain.
 
 ## Cross-cutting requirements
 

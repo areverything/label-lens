@@ -8,15 +8,17 @@ Where the project stands and what's built next, in dependency order. For *how an
 
 **Partial:** regulatory-status coverage is 15 of 28 additives; the other briefs honestly say "not yet compiled" per jurisdiction.
 
+**Also built:** the **evaluation harness** (Milestone 4). A 22-question gold set (`evals/gold.jsonl`), an LLM-judge (correctness / groundedness / safety), RAGAS (context precision/recall, faithfulness, answer relevancy), and a retrieval before/after comparison. Baseline recorded in `evals/results.json`; the reranker lifts Hit@1 0.75 → 0.85 and MRR 0.81 → 0.90, hybrid BM25+dense also lifts Hit@1 to 0.85. Tasks 5 and 6 answered with numbers in SUBMISSION.
+
 **Pending a one-time action:** the public deployment. The app is packaged and ready; deploying needs a Streamlit Community Cloud login and the `OPENROUTER_API_KEY` secret (runbook in [SUBMISSION §4.2](./docs/SUBMISSION.md#42-public-deployment)).
 
-**Not yet built:** the evaluation harness.
+**Not yet built:** the Task 7 next-steps reflection and the final submission items (Loom video, top-of-doc links).
 
 ### Next session: start here
 
 1. **Deploy** (5-minute manual step): push, then at [share.streamlit.io](https://share.streamlit.io) create the app from this repo + `streamlit_app.py`, set the `OPENROUTER_API_KEY` secret, and paste the URL into [SUBMISSION §4.2](./docs/SUBMISSION.md#42-public-deployment) and the top of SUBMISSION.
-2. **Milestone 4** (evals): the biggest remaining point block (Task 5 = 15 pts, Task 6 = 14 pts). Build the gold set from the curated status rows, then the RAGAS + LLM-judge harness, then the reranker and hybrid before/after tables.
-3. Optional, lower priority: close the status-coverage gap with the bulk loaders (`fda/eu/iarc/prop65`) so all 28 additives have a full status matrix.
+2. **Milestone 5** (package and submit): write the Task 7 reflection, record the ≤10-minute Loom demo (show a live tool call), confirm the repo is public, and fill the video/URL links at the top of SUBMISSION.
+3. Optional, lower priority: close the status-coverage gap with the bulk loaders (`fda/eu/iarc/prop65`); the eval shows this gap is what caps answer correctness, so it is the highest-leverage quality improvement.
 
 Notes for a fresh clone: the DuckDB store (`data/label_lens.duckdb`) and the Chroma index (`data/chroma/`) are local and gitignored, so rebuild them with `build_spine.py` then `load_products.py` then `build_briefs.py` then `build_index.py`. Open Food Facts' API is intermittently flaky (503); the loader uses the reliable category-based query and retries, but a small batch (`load_products.py 100`) is more likely to slip through than 400. The OpenRouter key is in `.env.local` (gitignored, stays on this machine).
 
@@ -68,6 +70,8 @@ Five milestones in dependency order (each one needs the previous). No dates: thi
 **Done when:** the public URL answers a question, including one live tool call, opened from a phone.
 
 ### Milestone 4: Evaluate, then improve with evidence
+
+**Status: done.** 22-question gold set from the curated status rows; LLM-judge (correctness/groundedness/safety) + RAGAS harness with a recorded baseline; reranker and hybrid before/after tables showing measured Hit@1/MRR gains. Conclusions written in SUBMISSION §5.3. Key finding: retrieval is the bottleneck (high faithfulness, lower recall), and the status-coverage gap caps correctness.
 
 **Goal:** the graded evaluation story.
 

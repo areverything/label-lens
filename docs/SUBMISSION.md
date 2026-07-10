@@ -195,26 +195,62 @@ Deploy steps (one-time): push to GitHub → [share.streamlit.io](https://share.s
 ## Task 5: Evals
 
 ### 5.1 Test dataset
-_TODO: describe `evals/gold.jsonl`: size, how questions were chosen, ground-truth source (the curated cited status rows)._
+
+`evals/gold.jsonl`, **22 question/reference pairs**. Ground truth comes from the curated, primary-source-cited status rows (the same rows that seed the store), so each reference answer is checkable against a regulation. Each row carries the question, its lane, the target additive's E-number (the retrieval ground truth), and a one-paragraph reference answer (the correctness ground truth).
+
+Questions were chosen to **stress the parts most likely to fail**, not to flatter the system:
+
+- **Near-identical additives** the retriever can confuse: the benzoate pair (E210/E211), nitrites vs nitrates (E249-E252), BHA vs BHT (E320/E321), and the three yellows / four reds / three blues.
+- **Exact-token queries** that meaning-based search can miss: bare E-numbers, a CFR citation ("21 CFR 74.706"), trade names ("FD&C Yellow 6").
+- **The safety boundary**: a "will this hurt me?" question that must return facts and refuse a medical verdict.
 
 ### 5.2 Evaluation harness
-_TODO: RAGAS retrieval metrics + LLM-as-judge for correctness / groundedness / safety; how to run it._
+
+Two layers, both through the OpenRouter gateway:
+
+1. **Retrieval metrics** (`src/label_lens/eval/`, no LLM): Hit@1, Hit@3, and MRR, scored by whether the correct additive's brief chunk is retrieved. Run: `uv run python scripts/eval_retrieval.py`.
+2. **Answer metrics** (`scripts/eval_answers.py`): an **LLM-as-judge** scores the real agent's answers for **correctness**, **groundedness** (is every claim cited?), and the **safety boundary** (keeps legal/hazard/harm distinct, refuses a medical verdict); plus **RAGAS** (context precision/recall, faithfulness, answer relevancy) over the RAG pipeline. Results are saved to `evals/results.json`.
+
+_(RAGAS 0.4.3 hard-imports a langchain module dropped in langchain 1.x; since we never use it, a one-line `sys.modules` shim in `eval/ragas_eval.py` lets RAGAS run against the current stack without downgrading everything.)_
+
+**Baseline** (default model, dense retrieval):
+
+| Agent answer (n=22) | Score | | RAGAS / RAG pipeline (n=10) | Score |
+|---|--:|---|---|--:|
+| Correctness | 0.695 | | Context precision | 0.708 |
+| Groundedness | 0.545 | | Context recall | 0.567 |
+| Safety boundary | 0.955 | | Faithfulness | 0.963 |
+| | | | Answer relevancy | 0.450 |
 
 ### 5.3 Conclusions
-_TODO: what the baseline numbers say about the pipeline._
+
+- **The safety boundary holds (0.955).** The agent almost always reports status and evidence and declines a medical verdict; the one slip was on a nitrite health-concern phrasing, not a medical verdict.
+- **Faithfulness is high (0.963) but recall is the bottleneck (0.567).** When context is retrieved, the agent does not hallucinate: it grounds answers in the passages. The lower context recall says the *retriever*, not the generator, is what to improve, which is exactly what Task 6 targets.
+- **Correctness (0.695) and groundedness (0.545) are capped by two things the eval pinpoints:** (1) the **status-coverage gap**, additives with no curated rows yet (E210, E132, E133, ...) make the agent correctly say "no status recorded", which the judge scores as a miss against the reference; and (2) **retrieval confusion on near-identical additives** (nitrate vs nitrite, BHA vs BHT), which produced wrong or muddled answers. The first is closed by the bulk loaders; the second is what the reranker and hybrid retrieval fix below.
 
 ---
 
 ## Task 6: Improving the Prototype
 
-### 6.1 Advanced retriever
-_TODO: reranker (bge-reranker); 1-2 sentences on why it should help (separating near-identical briefs)._
+Both improvements are measured with the same harness on the same 20 RAG gold questions, so the deltas are attributable to the retriever alone. `uv run python scripts/eval_retrieval.py`.
+
+| Retriever | Hit@1 | Hit@3 | MRR |
+|---|--:|--:|--:|
+| dense (baseline) | 0.750 | 0.850 | 0.810 |
+| **+ reranker** | **0.850** | **0.950** | **0.900** |
+| **hybrid (BM25 + dense)** | **0.850** | 0.900 | 0.895 |
+
+### 6.1 Advanced retriever: cross-encoder reranker
+
+The baseline dense retriever fetches a wider candidate set, then a **bge-reranker cross-encoder** (ONNX, local) re-scores each (query, passage) pair. It should help because the likeliest failure is confusing near-identical briefs, and a cross-encoder reads the query and passage *together* rather than comparing two independently-made embeddings, so it can tell E110 (Yellow 6) from E102 (Yellow 5).
 
 ### 6.2 Before/after results
-_TODO: table: baseline vs reranker on the gold set._
 
-### 6.3 Second improvement
-_TODO: hybrid BM25 + dense retrieval; table showing the measured gain._
+The reranker lifts every metric: **Hit@1 0.750 → 0.850, Hit@3 0.850 → 0.950, MRR 0.810 → 0.900** (table above). It fixed exactly the confusions the gold set targeted: "FD&C Yellow 6" (E110, was returning tartrazine E102) and the "21 CFR 74.706" cite (was returning E104).
+
+### 6.3 Second improvement: hybrid BM25 + dense
+
+Keyword BM25 scores are fused with dense scores by reciprocal-rank fusion. This helps where the query carries **exact tokens** (E-numbers, CAS, CFR cites) that meaning-based search underweights. It raises **Hit@1 to 0.850** and fixed the nitrate/nitrite case (BM25 keys on "nitrate" to return E251, which dense and even the reranker missed). The honest trade-off the eval also surfaced: hybrid can regress on purely semantic queries (it pulled BHA into an aspartame-carcinogen question on a shared "carcinogen" token), so the two techniques are complementary rather than strictly ordered. Residual misses ("Blue 2", a bare "E216") point to future work: bare-ID lookups are better served by the store lane than by retrieval.
 
 ---
 
