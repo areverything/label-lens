@@ -72,3 +72,21 @@ def get_log(con: duckdb.DuckDBPyConnection, user_id: str) -> list[dict]:
             """SELECT barcode, name, logged_at FROM product_log
                WHERE user_id = ? ORDER BY id""", [user_id]).fetchall()
     ]
+
+
+def get_log_with_additives(con: duckdb.DuckDBPyConnection, user_id: str) -> list[dict]:
+    """Logged products joined to their real additive tags from the product table.
+
+    Grounds cumulative questions: the additive list comes from the store, not the
+    model's guess. `additives` is the comma-joined en:e### tags, empty if the
+    barcode is not in the product table.
+    """
+    return [
+        {"barcode": b, "name": n, "additives": tags or ""}
+        for b, n, tags in con.execute(
+            """SELECT pl.barcode, COALESCE(NULLIF(pl.name, ''), p.name),
+                      p.additives_tags
+               FROM product_log pl
+               LEFT JOIN product p ON pl.barcode = p.barcode
+               WHERE pl.user_id = ? ORDER BY pl.id""", [user_id]).fetchall()
+    ]
