@@ -31,3 +31,9 @@ def load_corpus() -> tuple[Doc, ...]:
         for c in chunk_brief(p.read_text()):
             docs.append(Doc(c.chunk_id, c.e_number, c.name, c.section, c.text))
     return tuple(docs)
+
+
+@lru_cache(maxsize=1)
+def by_id() -> dict[str, Doc]:
+    """Chunk_id -> Doc, for looking up a retrieved chunk's text and metadata."""
+    return {d.chunk_id: d for d in load_corpus()}
