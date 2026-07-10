@@ -135,11 +135,25 @@ flowchart TD
 
 **One brief per additive, split on its labelled sections** (identity / regulatory status / evidence). Chosen over fixed-size chunks because user questions map onto those sections (status vs evidence), so each retrieved chunk is self-contained and keeps its citation intact; the corpus is small enough that this stays simple. Full rationale in [TECH_DESIGN → Chunking](./TECH_DESIGN.md#chunking-for-the-rag-briefs).
 
-### 3.2 Data source and external API
+### 3.2 Data sources and external APIs
 
-- **Our own data (RAG):** distilled per-additive briefs built on the CAS spine (Open Food Facts taxonomy for names/codes + Wikidata for CAS + curated cited regulatory status). Role: the knowledge the assistant reasons over.
-- **External API (agentic search of public data):** openFDA food-enforcement (recalls) and the Federal Register (new bans/revocations). Role: keep answers current with live regulator actions.
-- **How they interact:** the agent answers stable "what's the status / why" questions from the briefs (RAG) and reaches for the live APIs when a question is about *right now* (a recall or a recent ban), then merges both into one cited answer.
+**Our own data.** The assistant reasons over a CAS-keyed spine (each additive resolved to its CAS registry number, the join key that reconciles regulators who name additives differently) and a per-additive brief distilled from it. That data is assembled from four sources:
+
+| Source | What it supplies | Used by |
+|---|---|---|
+| **Open Food Facts** | Additive taxonomy (names ↔ E-numbers) and the 100 US candy products in the `product` table | Store + product lookup |
+| **Wikidata** | CAS registry numbers per additive (the cross-regulator join key) | Store (spine) |
+| **Curated, primary-source-cited regulatory status** | Hand-verified status rows from the regulators themselves: EU EUR-Lex (Reg (EC) 1333/2008), US FDA (21 CFR + Federal Register), California (AB 418, Prop 65), IARC monographs | Store + RAG |
+| **EFSA scientific opinions** | The safety-evidence citations in each brief's evidence section (e.g. the 2021 titanium dioxide genotoxicity opinion behind the EU ban) | RAG |
+
+The briefs (one per additive, chunked on identity / regulatory status / evidence) are the RAG corpus; the same status rows live in DuckDB as the structured Store lane. Every claim carries its citation.
+
+**External APIs (live, agentic search of public data).** Two US government endpoints keep answers current with actions the briefs cannot pre-bake:
+
+- **openFDA food-enforcement** — product recalls.
+- **Federal Register** — new bans and authorization revocations.
+
+**How they interact.** The agent answers stable "what's the status / why" questions from the Store and the briefs (RAG), and reaches for the live APIs when a question is about *right now* (a recall or a recent ban), then merges the results into one cited answer.
 
 ---
 
