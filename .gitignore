@@ -18,6 +18,9 @@ venv/
 # Data caches / downloads
 *.duckdb
 *.duckdb.wal
+# Exception: the built store is committed so the deployed app has data without an
+# expensive rebuild (briefs cost LLM calls; Open Food Facts is flaky). ~2.3 MB.
+!data/label_lens.duckdb
 data/raw/
 data/cache/
 data/chroma/

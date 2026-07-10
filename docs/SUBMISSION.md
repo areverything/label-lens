@@ -71,7 +71,7 @@ Every component of the system, with the one-sentence reason it was chosen. Choic
 | LLM | strong general model via OpenRouter (configurable) | The gateway makes the model swappable, so we tune cost vs quality during evals. |
 | Agent orchestration | **LangGraph** | Purpose-built for an agent that reasons, routes to tools, and carries memory. |
 | Tools | status-query, brief-retriever, openFDA-recall, Federal-Register-ban | They realise the three lanes; the two government APIs are the required external search. |
-| Embedding model | **bge-small-en-v1.5**, local (Apple Silicon / MPS) | Tiny corpus, so a small local model is free, fast, and needs no external API. |
+| Embedding model | **bge-small-en-v1.5**, local via fastembed (ONNX, CPU) | Tiny corpus, so a small local model is free, fast, and needs no external API; ONNX keeps the deploy light (no torch). |
 | Vector database | **Chroma** (local file) | Simplest possible store for a small corpus; nothing to run or host. |
 | Monitoring | **LangSmith** | Traces every agent step and retrieval to debug and to back the eval story. |
 | Evaluation framework | **RAGAS** + LLM-as-judge | RAGAS scores retrieval; the judge scores whether the answer is correct, grounded, and safe. |
@@ -88,7 +88,7 @@ flowchart LR
     AG -->|model calls| GW[OpenRouter gateway to LLM]
     AG -->|status lookup| DB[(DuckDB<br/>additives + status + memory)]
     AG -->|retrieve briefs| VDB[(Chroma vector DB)]
-    EMB[bge-small embeddings<br/>local MPS] --- VDB
+    EMB[bge-small embeddings<br/>local ONNX] --- VDB
     AG -->|recalls| FDA[[openFDA API]]
     AG -->|new bans| FR[[Federal Register API]]
     AG -.traces.-> LS[LangSmith monitoring]
@@ -177,7 +177,18 @@ The agent is a LangGraph ReAct loop over four tools, one per lane ([`agent/tools
 Before routing, it reads the user's memory (diet/allergy profile + logged products) and folds the logged products' *real* additives, joined from the `product` table, into the prompt, so cumulative questions are grounded in the store rather than guessed. Every model call goes through the OpenRouter gateway; the safety boundary (legal ≠ hazard ≠ harm, no medical verdict) is enforced in the system prompt. All six evaluation question types in [§1.4](#14-questions-we-evaluate-against) return cited answers; runs are traced in LangSmith when a key is set.
 
 ### 4.2 Public deployment
-_TODO: public Streamlit Community Cloud URL._
+
+Deployed to **Streamlit Community Cloud** from this repo. Entry point: [`streamlit_app.py`](../streamlit_app.py) at the repo root (auto-detected). Runs in a phone or laptop browser.
+
+- **Public URL:** _TODO: paste the share.streamlit.io URL after the first deploy._
+
+How it is packaged for the free tier:
+
+- **Data:** the built DuckDB store (`data/label_lens.duckdb`, ~2.3 MB) is committed, so the app has the additive/status/product data on clone without an expensive rebuild. The Chroma index is rebuilt once on first boot from the committed briefs (cached, no LLM cost).
+- **Dependencies:** `requirements.txt` (generated from the uv lock). The embedding model runs through fastembed/ONNX, so there is no torch/CUDA install to blow the memory limit.
+- **Secret:** set `OPENROUTER_API_KEY` in the app's *Settings → Secrets*; the app bridges it into the environment the agent reads.
+
+Deploy steps (one-time): push to GitHub → [share.streamlit.io](https://share.streamlit.io) → *New app* → pick this repo and `streamlit_app.py` → set the `OPENROUTER_API_KEY` secret → Deploy.
 
 ---
 

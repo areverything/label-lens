@@ -4,15 +4,17 @@ Where the project stands and what's built next, in dependency order. For *how an
 
 ## Where we are
 
-**Built:** the CAS store (28 additives resolved to CAS + 32 cited regulatory-status rows), the **28-brief RAG corpus** in `data/briefs/` (committed), **100 US candy products** in the `product` table, the **Chroma vector index** over the briefs, and the **working LangGraph agent**: four tools (Store / RAG / openFDA / Federal Register) + user memory, every model call through OpenRouter, LangSmith tracing when a key is set. All six eval question types return cited answers locally. See the [Quick Start](./README.md#quick-start).
+**Built:** the CAS store (28 additives resolved to CAS + 32 cited regulatory-status rows), the **28-brief RAG corpus** in `data/briefs/` (committed), **100 US candy products** in the `product` table, the **Chroma vector index** over the briefs, the **working LangGraph agent** (four tools: Store / RAG / openFDA / Federal Register, + user memory, every model call through OpenRouter, LangSmith tracing when a key is set), and the **Streamlit chat UI** (`streamlit_app.py`, deploy-ready for Community Cloud). All six eval question types return cited answers locally. See the [Quick Start](./README.md#quick-start).
 
 **Partial:** regulatory-status coverage is 15 of 28 additives; the other briefs honestly say "not yet compiled" per jurisdiction.
 
-**Not yet built:** the Streamlit UI, the public deployment, and the evaluation harness.
+**Pending a one-time action:** the public deployment. The app is packaged and ready; deploying needs a Streamlit Community Cloud login and the `OPENROUTER_API_KEY` secret (runbook in [SUBMISSION §4.2](./docs/SUBMISSION.md#42-public-deployment)).
+
+**Not yet built:** the evaluation harness.
 
 ### Next session: start here
 
-1. **Milestone 3** (Streamlit UI + public deployment): closes the rest of Task 4 (front end + public URL, 15 pts) and the phone/laptop-browser requirement. Small effort.
+1. **Deploy** (5-minute manual step): push, then at [share.streamlit.io](https://share.streamlit.io) create the app from this repo + `streamlit_app.py`, set the `OPENROUTER_API_KEY` secret, and paste the URL into [SUBMISSION §4.2](./docs/SUBMISSION.md#42-public-deployment) and the top of SUBMISSION.
 2. **Milestone 4** (evals): the biggest remaining point block (Task 5 = 15 pts, Task 6 = 14 pts). Build the gold set from the curated status rows, then the RAGAS + LLM-judge harness, then the reranker and hybrid before/after tables.
 3. Optional, lower priority: close the status-coverage gap with the bulk loaders (`fda/eu/iarc/prop65`) so all 28 additives have a full status matrix.
 
@@ -52,6 +54,8 @@ Five milestones in dependency order (each one needs the previous). No dates: thi
 **Done when:** each of the six sample questions in [SUBMISSION §1.4](./docs/SUBMISSION.md#14-questions-we-evaluate-against) returns a cited answer locally, visible as a trace in LangSmith.
 
 ### Milestone 3: The app, in a browser, public
+
+**Status: UI done, deploy pending a one-time login.** The Streamlit chat app (`streamlit_app.py`) is built, driven headlessly by AppTest, and packaged for Community Cloud (committed DuckDB, `requirements.txt`, ONNX embeddings so no torch, secrets bridge, index built on first boot). Only the manual deploy step remains.
 
 **Goal:** make it usable and reachable, the cheap way.
 

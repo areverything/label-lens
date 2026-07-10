@@ -71,7 +71,7 @@ Every scored deliverable, its points, where it's answered in [SUBMISSION.md](./S
 | Final | 10 | Written document answering every deliverable | [SUBMISSION.md](./SUBMISSION.md) | 🔨 |
 | Final | 0 | All relevant code | the repository | 🔨 |
 
-> Status so far: the CAS store, the 28-brief RAG corpus, the Chroma index, and the **working LangGraph agent** (four tools + memory, running through OpenRouter) are **built**; all six eval question types return cited answers locally. Task 1-3 answers are drafted in SUBMISSION.md. Task 4 remains open on the front end + public deployment (Milestone 3); Task 5-7 depend on the eval harness still to build.
+> Status so far: the CAS store, the 28-brief RAG corpus, the Chroma index, the **working LangGraph agent** (four tools + memory, through OpenRouter), and the **Streamlit chat UI** are **built**; all six eval question types return cited answers locally. Task 1-3 answers are drafted in SUBMISSION.md. Task 4's front end is done; only the one-time public deploy (a Community Cloud login) remains. Task 5-7 depend on the eval harness still to build.
 
 ## Cross-cutting requirements
 
@@ -81,8 +81,8 @@ Not separate rubric lines, but required across the build (mostly folded into Tas
 - **Own data for RAG**: done (the 28 per-additive briefs in `data/briefs/`, embedded into Chroma).
 - **External API / agentic search**: done (openFDA recalls + Federal Register bans, `agent/live.py`).
 - **Memory component**: done (user diet/allergy profile + product log, `agent/memory.py`).
-- **Runs in a phone and laptop browser**: planned (Streamlit, Milestone 3).
-- **Front end + public deployment**: planned (Streamlit Community Cloud, Milestone 3). Explicitly required by Task 4.
+- **Runs in a phone and laptop browser**: done (Streamlit chat UI, `streamlit_app.py`; responsive by default).
+- **Front end + public deployment**: front end done; public deploy packaged and pending a one-time Community Cloud login (runbook in SUBMISSION §4.2). Explicitly required by Task 4.
 
 ## Where the points are (prioritise these)
 
