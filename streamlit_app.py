@@ -118,7 +118,15 @@ def main() -> None:
     if "messages" not in st.session_state:
         st.session_state.messages = []
 
-    if not st.session_state.messages:
+    # Resolve the prompt first (a pending example-click, else freshly typed input).
+    # chat_input is always rendered; it pins to the bottom and never drops a click.
+    typed = st.chat_input("Ask about an additive or product...")
+    prompt = st.session_state.pop("pending", None) or typed
+
+    # Starter chips only on the empty state and only when not already answering, so
+    # they vanish cleanly on the first question and never linger into a later run
+    # where the block is skipped and a click on a stale chip would be lost.
+    if not st.session_state.messages and not prompt:
         st.write("**Try one of these:**")
         cols = st.columns(2)
         for i, ex in enumerate(EXAMPLES):
@@ -129,8 +137,6 @@ def main() -> None:
     for m in st.session_state.messages:
         st.chat_message(m["role"]).markdown(m["content"])
 
-    prompt = st.chat_input("Ask about an additive or product...")
-    prompt = prompt or st.session_state.pop("pending", None)
     if prompt:
         st.session_state.messages.append({"role": "user", "content": prompt})
         st.chat_message("user").markdown(prompt)
