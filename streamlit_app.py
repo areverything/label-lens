@@ -121,6 +121,44 @@ div[class*="_rm_"] button:hover { background-color:#c94444 !important; border-co
 
 /* Keep the product-card action buttons on one line. */
 div[class*="_add_"] button, div[class*="_rm_"] button { white-space: nowrap !important; }
+
+/* Phones: the header's columns stack, and a fixed, fixed-height bar can't hold
+   the stacked logo + tab rows, so the tabs spilled over and painted on top of
+   the chat. On narrow screens let the header flow with the page (static, natural
+   height): the logo sits on one row, the tabs centre on the next, and nothing
+   overlaps. The desktop rules above still apply on wider screens. */
+@media (max-width: 640px) {
+  /* Keep the bar pinned, but let it grow to two rows (logo, then tabs) instead of
+     forcing everything onto one 3.75rem line that the columns overflowed. */
+  .st-key-ll_header {
+    height: auto !important;
+    min-height: 5.75rem;
+    display: block !important;
+    padding: 0.35rem 1rem 0.55rem !important;
+  }
+  /* Undo the full-height flex-centering chain so the two rows size to content. */
+  .st-key-ll_header > div,
+  .st-key-ll_header [data-testid="stHorizontalBlock"],
+  .st-key-ll_header [data-testid="stColumn"],
+  .st-key-ll_header [data-testid="stElementContainer"],
+  .st-key-ll_header [data-testid="stButtonGroup"],
+  .st-key-ll_header [data-testid="stMarkdown"],
+  .st-key-ll_header [data-testid="stMarkdown"] > div,
+  .st-key-ll_header [data-testid="stMarkdownContainer"] { height: auto !important; }
+  /* Drop the desktop right-hand spacer column (it reserved room for Streamlit's
+     Share button, which collapses to a compact menu on phones) and centre the
+     tab row under the logo. */
+  .st-key-ll_header [data-testid="stColumn"]:last-child { display: none !important; }
+  .st-key-ll_header [data-testid="stButtonGroup"] { justify-content: center !important; }
+  /* Match the content offset and sidebar to the taller two-row bar. */
+  [data-testid="stMainBlockContainer"], .block-container { padding-top: 6.5rem !important; }
+  [data-testid="stSidebar"] { margin-top: 5.75rem; }
+  /* Park the collapsed-sidebar chevron in the header's tab row (dark bar, left of
+     the centred tabs) so it stops floating over the caption text below. */
+  [data-testid="stExpandSidebarButton"], [data-testid="stSidebarCollapsedControl"] {
+    top: 3.4rem !important; left: 0.6rem !important;
+  }
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -320,6 +358,14 @@ def render_chat() -> None:
     if "messages" not in st.session_state:
         st.session_state.messages = []
 
+    # Streamlit's chat container auto-scrolls to the bottom to keep the newest
+    # message in view. On the empty initial screen that just tucks the top of the
+    # page (the intro caption) under the fixed header, especially on mobile. While
+    # there are no messages, hold the scroll at the top; once a conversation
+    # exists we leave it alone so new replies stay visible.
+    if not st.session_state.messages:
+        _pin_scroll_top()
+
     # Resolve the prompt (a pending chip-click, else freshly typed input).
     # chat_input is always rendered; it pins to the bottom and never drops a click.
     typed = st.chat_input("Ask about an additive or product...")
@@ -389,6 +435,24 @@ def _scroll_to_top() -> None:
         '["section[data-testid=\\"stMain\\"]","[data-testid=\\"stAppScrollToBottomContainer\\"]"]'
         '.forEach(s=>{const c=w.document.querySelector(s);if(c)c.scrollTop=0;});'
         'w.scrollTo(0,0);if(++n<18)requestAnimationFrame(f);})();</script>',
+        height=0,
+    )
+
+
+def _pin_scroll_top() -> None:
+    """Hold the chat container at the top for ~1.2s, beating Streamlit's
+    auto-scroll-to-bottom on the empty initial view. A one-shot reset loses that
+    race, so this listens for the scroll and forces it back to 0, then detaches so
+    it never fights the user's own scrolling."""
+    from streamlit.components.v1 import html
+    html(
+        '<script>(function(){const d=window.parent.document;'
+        'const sel="[data-testid=\\"stAppScrollToBottomContainer\\"]";'
+        'const pin=()=>{const c=d.querySelector(sel);if(c)c.scrollTop=0;'
+        'window.parent.scrollTo(0,0);};'
+        'const c=d.querySelector(sel);if(!c)return;'
+        'c.addEventListener("scroll",pin);pin();'
+        'setTimeout(()=>c.removeEventListener("scroll",pin),1200);})();</script>',
         height=0,
     )
 
