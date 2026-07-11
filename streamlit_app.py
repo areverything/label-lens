@@ -107,6 +107,18 @@ div[class*="_rm_"] button:hover { background-color:#c94444 !important; border-co
    clickable. */
 [data-testid="stMainBlockContainer"], .block-container { padding-top: 5rem !important; }
 [data-testid="stSidebar"] { margin-top: 3.75rem; }
+/* Sidebar collapse arrow: always visible (no hover needed) and, thanks to the
+   margin above, it sits below the bar so it stays clickable. */
+[data-testid="stSidebarCollapseButton"] { opacity: 1 !important; visibility: visible !important; }
+/* When the sidebar is collapsed the expand button appears top-left, under the
+   bar and over the logo. Pin it below the bar (fixed) so it's clear and clickable. */
+[data-testid="stExpandSidebarButton"], [data-testid="stSidebarCollapsedControl"] {
+  position: fixed !important; top: 4.5rem !important; left: 0.5rem !important;
+  z-index: 999994 !important;
+}
+
+/* Keep the product-card action buttons on one line. */
+div[class*="_add_"] button, div[class*="_rm_"] button { white-space: nowrap !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -271,8 +283,10 @@ def _header() -> str:
         left, mid, _right = st.columns([3, 4, 2], vertical_alignment="center")
         with left:
             st.markdown(
-                "<span style='font-size:1.5rem;font-weight:700;white-space:nowrap;"
-                "color:#eaecf2'>🔎 Label Lens</span>", unsafe_allow_html=True)
+                "<span style='display:inline-flex;align-items:center;gap:0.4rem;"
+                "font-size:1.4rem;font-weight:700;line-height:1;white-space:nowrap;"
+                "color:#eaecf2'><span style='font-size:1.2rem;line-height:1'>🔎</span>"
+                "Label Lens</span>", unsafe_allow_html=True)
         with mid:
             view = st.segmented_control(
                 "view", ["💬 Chat", "🧺 Pantry", "👤 Profile"], default="💬 Chat",
@@ -281,6 +295,7 @@ def _header() -> str:
 
 
 def render_profile() -> None:
+    _scroll_to_top()
     con, uid = _con(), _user_id()
     st.subheader("👤 Your profile")
     st.caption("The agent reads this to personalise answers. It still cites every fact.")
@@ -355,7 +370,22 @@ def _show_details(p: dict) -> None:
         st.markdown(f"[View on Open Food Facts ↗]({p['off_url']})")
 
 
+def _scroll_to_top() -> None:
+    """Pin the page to the top for a moment after switching tabs. The chat view
+    uses a container that briefly scrolls to the bottom during the transition,
+    which reads as a jarring jump; this overrides it for ~0.3s."""
+    from streamlit.components.v1 import html
+    html(
+        '<script>const w=window.parent;let n=0;(function f(){'
+        '["section[data-testid=\\"stMain\\"]","[data-testid=\\"stAppScrollToBottomContainer\\"]"]'
+        '.forEach(s=>{const c=w.document.querySelector(s);if(c)c.scrollTop=0;});'
+        'w.scrollTo(0,0);if(++n<18)requestAnimationFrame(f);})();</script>',
+        height=0,
+    )
+
+
 def render_pantry() -> None:
+    _scroll_to_top()
     con, uid = _con(), _user_id()
     products = _products()
     in_pantry = _pantry_barcodes(con, uid)
@@ -395,11 +425,11 @@ def _product_grid(items: list[dict], in_pantry: set[str], *, key_prefix: str,
                          type="tertiary", use_container_width=True):
                 _show_details(p)
             if bc in in_pantry:
-                if st.button("Remove from Pantry", key=f"{key_prefix}_rm_{bc}",
+                if st.button("✕ Remove", key=f"{key_prefix}_rm_{bc}",
                              use_container_width=True):
                     memory.remove_product(con, uid, bc)
                     st.rerun()
-            elif st.button("＋ Add to Pantry", key=f"{key_prefix}_add_{bc}",
+            elif st.button("＋ Add", key=f"{key_prefix}_add_{bc}",
                            type="primary", use_container_width=True):
                 memory.log_product(con, uid, barcode=bc, name=p["name"])
                 st.rerun()
