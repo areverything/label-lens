@@ -5,12 +5,12 @@ what the app did, AND a certification reviewer can see exactly how: the techniqu
 used and the concrete call made (SQL query, RAG vector search, or live API
 request). Every line is derived from the real messages the agent produced.
 
-Each step is a dict:
-  {icon, title, tool, query, how, lines, note, tech, final}
+Each step is a dict: {icon, title, tool, query, lines, note, tech, final}.
 - title: the plain-English action (for the shopper).
-- tool/query/how: the tool called and a plain description of the method.
-- tech: {technique, call} — the precise technique and call (for the reviewer).
-- lines: the plain results. note: an optional "why it matters".
+- lines: the plain results.  note: an optional "why it matters".
+- tool/query + tech {technique, call}: one consolidated technical block naming
+  the tool called, the technique, and the exact call (for the reviewer).
+The agent framework and model are run-level, returned once by agent_info().
 """
 from __future__ import annotations
 
@@ -48,14 +48,18 @@ _STATUS = {
 
 
 def _step(icon: str, title: str, lines: list[str], note: str = "", *,
-          tool: str = "", query: str = "", how: str = "",
+          tool: str = "", query: str = "",
           tech: dict | None = None, final: bool = False) -> dict:
-    return {"icon": icon, "title": title, "tool": tool, "query": query, "how": how,
+    return {"icon": icon, "title": title, "tool": tool, "query": query,
             "lines": lines, "note": note, "tech": tech or {}, "final": final}
 
 
 def agent_info() -> dict:
-    """Run-level facts for the reviewer: the agent framework and the model."""
+    """Run-level facts for the reviewer: the agent framework and the model.
+
+    These frame every step (the model chose the tools), so they are shown once at
+    the top of the log rather than repeated on each step.
+    """
     model = os.getenv("OPENROUTER_MODEL", "openai/gpt-4o-mini")
     return {
         "framework": "LangGraph ReAct agent (create_react_agent)",
@@ -98,7 +102,6 @@ def _store_step(term: str, content: str) -> dict:
     title = f"Looked up the official rulings on “{term}”"
     kw = {
         "tool": "additive_status", "query": term,
-        "how": "Database lookup in the additive rulings table",
         "tech": {
             "technique": "Deterministic SQL lookup (no LLM)",
             "call": ("resolve_additive(term) → SELECT jurisdiction, status, detail, "
@@ -136,7 +139,6 @@ def _rag_step(term: str, content: str) -> dict:
     title = f"Read the evidence notes about “{term}”"
     kw = {
         "tool": "search_briefs", "query": term,
-        "how": "AI semantic search (RAG) over the evidence notes",
         "tech": {
             "technique": "Dense vector retrieval (RAG)",
             "call": (f'Chroma.similarity_search_with_score("{term}", k=4) over '
@@ -158,7 +160,6 @@ def _recalls_step(term: str, content: str) -> dict:
     title = f"Checked for active recalls of “{term}”"
     kw = {
         "tool": "check_recalls", "query": term,
-        "how": "Live web API call to the FDA",
         "tech": {
             "technique": "Live REST API call (openFDA food-enforcement)",
             "call": (f'GET api.fda.gov/food/enforcement.json?search='
@@ -180,7 +181,6 @@ def _actions_step(term: str, content: str) -> dict:
     title = f"Checked for recent government action on “{term}”"
     kw = {
         "tool": "recent_regulatory_actions", "query": term,
-        "how": "Live web API call to the US Federal Register",
         "tech": {
             "technique": "Live REST API call (US Federal Register)",
             "call": (f"GET federalregister.gov/api/v1/documents.json?"
@@ -212,12 +212,8 @@ def _answer_step(reply: str, *, tool_calls: bool) -> dict:
         "not proven harmful", "isn’t the same", "isn't the same",
     )):
         lines.append("It keeps “banned somewhere” separate from “proven harmful”.")
-    model = os.getenv("OPENROUTER_MODEL", "openai/gpt-4o-mini")
-    how = ("The AI wrote the answer from the results above"
-           if tool_calls else
-           "The AI answered directly, without calling any tool")
-    tech = {
-        "technique": "LLM synthesis over the tool results (ReAct agent)",
-        "call": f"create_react_agent (LangGraph); model {model} via OpenRouter",
-    }
-    return _step("✅", "Wrote the answer", lines, how=how, tech=tech, final=True)
+    # No exact call here: the framework and model are named once in agent_info().
+    technique = ("LLM synthesis: the model composed the answer from the tool "
+                 "results above" if tool_calls else
+                 "The model answered directly, without calling any tool")
+    return _step("✅", "Wrote the answer", lines, tech={"technique": technique}, final=True)
