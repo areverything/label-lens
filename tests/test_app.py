@@ -24,7 +24,7 @@ def _stub_answer(monkeypatch):
 def test_app_renders_title_and_examples():
     at = AppTest.from_file(APP).run(timeout=30)
     assert not at.exception
-    assert any("Label Lens" in t.value for t in at.title)
+    assert any("Label Lens" in md.value for md in at.markdown)  # header logo
     assert len(at.button) >= 4  # the example-question buttons
 
 

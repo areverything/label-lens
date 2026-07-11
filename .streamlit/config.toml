@@ -1,0 +1,5 @@
+# Viewer toolbar mode: keep the Share button but drop the developer tools
+# (Rerun / Clear cache / Deploy) and their keyboard shortcuts, so pressing "C"
+# (e.g. while doing Cmd+C to copy text) no longer opens the Clear-cache dialog.
+[client]
+toolbarMode = "viewer"
