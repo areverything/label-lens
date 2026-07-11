@@ -2,15 +2,16 @@
 
 Runs in a phone or laptop browser. Ask about an additive or a product; the agent
 routes to the Store (legal status), RAG (evidence), or a live government API and
-answers with citations. The sidebar holds the user's memory: a diet/allergy
-profile and a log of products, which the agent reads to personalise and to answer
-cumulative questions.
+answers with citations. Three tabs in the header: Chat, Pantry (browse products
+and build a pantry), and Profile (diet/allergies). The sidebar shows a read-only
+summary of the profile and pantry.
 
 Entry point for Streamlit Community Cloud (auto-detected at the repo root).
 """
 from __future__ import annotations
 
 import hmac
+import html
 import os
 import sys
 import uuid
@@ -43,12 +44,24 @@ from label_lens.rag.index import ensure_index  # noqa: E402
 
 st.set_page_config(page_title="Label Lens", page_icon="🔎", layout="centered")
 
+# Keep the chrome minimal: hide the ⋮ menu (Rerun / Print / Record / Clear cache)
+# and the Deploy button, and give the "Remove from pantry" buttons a red shade
+# (their widget keys contain "_rm_", which Streamlit exposes as an st-key- class).
+st.markdown("""
+<style>
+#MainMenu, [data-testid="stMainMenu"], [data-testid="stAppDeployButton"] { display: none !important; }
+div[class*="_rm_"] button { background-color:#e05656 !important; border-color:#e05656 !important; color:#fff !important; }
+div[class*="_rm_"] button:hover { background-color:#c94444 !important; border-color:#c94444 !important; }
+</style>
+""", unsafe_allow_html=True)
+
 
 @st.cache_resource(show_spinner="Building the brief index (first load only)...")
 def _warm() -> bool:
     """Build the Chroma index once per host if it is missing (deployed clones)."""
     ensure_index()
     return True
+
 
 # A pool of starter questions across the three lanes. Four are shown at a time;
 # using one rotates in the next unused one, so the suggestions stay fresh.
@@ -69,12 +82,7 @@ CHIPS_SHOWN = 4
 
 @st.cache_resource
 def _product_images() -> dict[str, str]:
-    """barcode -> front-image URL, from a committed JSON sidecar.
-
-    Images live in a text file, not the DuckDB, so they deploy cleanly: the
-    committed DB is mutated at runtime (memory tables) and a dirtied binary can
-    be skipped by the host's git update, but a JSON file always updates.
-    """
+    """barcode -> front-image URL, from a committed JSON sidecar (deploys cleanly)."""
     import json
     path = DATA / "product_images.json"
     return json.loads(path.read_text()) if path.exists() else {}
@@ -82,14 +90,29 @@ def _product_images() -> dict[str, str]:
 
 @st.cache_resource
 def _products() -> list[dict]:
-    """Every product with additives: name, barcode, image URL, additive tags."""
+    """Every product with additives, with the fields the card and detail view need."""
     images = _product_images()
     rows = _con().execute(
-        """SELECT name, barcode, additives_tags FROM product
+        """SELECT name, barcode, additives_tags, brands, categories,
+                  ingredients_text, off_url
+           FROM product
            WHERE name IS NOT NULL AND additives_tags <> ''
            ORDER BY name""").fetchall()
-    return [{"name": n, "barcode": b, "image": images.get(b), "additives": tags}
-            for n, b, tags in rows]
+    return [{"name": n, "barcode": b, "additives": tags, "brands": br,
+             "categories": cat, "ingredients": ing, "off_url": url,
+             "image": images.get(b)}
+            for n, b, tags, br, cat, ing, url in rows]
+
+
+@st.cache_resource
+def _additive_names() -> dict[str, str]:
+    """E-number -> chemical name, for the product detail view."""
+    return {e: n for e, n in _con().execute(
+        "SELECT e_number, name FROM additives").fetchall()}
+
+
+def _products_by_barcode() -> dict[str, dict]:
+    return {p["barcode"]: p for p in _products()}
 
 
 def _codes(additives_tags: str) -> str:
@@ -135,49 +158,75 @@ def _password_ok() -> bool:
     return False
 
 
-def sidebar() -> None:
-    uid = _user_id()
-    con = _con()
+def sidebar_summary() -> None:
+    """Read-only summary of the profile and pantry. Editing lives in the tabs."""
+    con, uid = _con(), _user_id()
     with st.sidebar:
-        st.header("Your profile")
-        st.caption("The agent reads this to personalise answers. It still cites every fact.")
-        profile = memory.get_profile(con, uid) or {"diet": "", "allergies": ""}
-        with st.form("profile"):
-            diet = st.text_input("Diet", value=profile["diet"], placeholder="e.g. vegetarian")
-            allergies = st.text_input("Allergies", value=profile["allergies"], placeholder="e.g. peanuts")
-            if st.form_submit_button("Save profile"):
-                memory.set_profile(con, uid, diet=diet, allergies=allergies)
-                st.success("Saved.")
+        st.subheader("Your profile")
+        prof = memory.get_profile(con, uid) or {"diet": "", "allergies": ""}
+        if prof["diet"] or prof["allergies"]:
+            st.caption(f"**Diet:** {prof['diet'] or '—'}  \n**Allergies:** {prof['allergies'] or '—'}")
+        else:
+            st.caption("Not set yet. Add it in the **Profile** tab.")
 
         pantry = memory.get_log_with_additives(con, uid)
-        st.header(f"Pantry ({len(pantry)})")
-        st.caption("Build your pantry in the **Pantry** tab, then ask cumulative questions in **Chat**.")
+        st.subheader(f"Your pantry ({len(pantry)})")
+        if not pantry:
+            st.caption("Empty. Add candies in the **Pantry** tab.")
+            return
+        by_bc = _products_by_barcode()
         for r in pantry:
-            st.markdown(f"**{r['name']}** — {_codes(r['additives']) or 'additives not on file'}")
+            p = by_bc.get(r["barcode"], {})
+            img = _product_images().get(r["barcode"], "")
+            tip = html.escape(
+                f"Additives: {_codes(r['additives']) or 'none on file'}\n"
+                f"Ingredients: {(p.get('ingredients') or 'not on file')[:300]}")
+            thumb = (f'<img src="{img}" style="width:34px;height:34px;object-fit:cover;'
+                     'border-radius:6px;flex:0 0 auto">' if img
+                     else '<span style="font-size:1.6rem">🍬</span>')
+            st.markdown(
+                f'<div title="{tip}" style="display:flex;align-items:center;gap:8px;margin:5px 0">'
+                f'{thumb}<span style="font-size:0.85rem">{html.escape(r["name"][:26])}</span></div>',
+                unsafe_allow_html=True)
 
 
 def main() -> None:
     st.title("🔎 Label Lens")
-    st.caption(
-        "Ask about a food additive or a product. Answers are cited from regulators "
-        "(EU, US FDA, California, IARC), separate legal status from hazard from harm, "
-        "and never give medical advice."
-    )
     if not _password_ok():
         return
     _warm()
-    sidebar()
+    sidebar_summary()
 
     view = st.segmented_control(
-        "view", ["💬 Chat", "🧺 Pantry"], default="💬 Chat",
+        "view", ["💬 Chat", "🧺 Pantry", "👤 Profile"], default="💬 Chat",
         key="view", label_visibility="collapsed")
     if view == "🧺 Pantry":
         render_pantry()
+    elif view == "👤 Profile":
+        render_profile()
     else:
         render_chat()
 
 
+def render_profile() -> None:
+    con, uid = _con(), _user_id()
+    st.subheader("👤 Your profile")
+    st.caption("The agent reads this to personalise answers. It still cites every fact.")
+    profile = memory.get_profile(con, uid) or {"diet": "", "allergies": ""}
+    with st.form("profile"):
+        diet = st.text_input("Diet", value=profile["diet"], placeholder="e.g. vegetarian")
+        allergies = st.text_input("Allergies", value=profile["allergies"], placeholder="e.g. peanuts")
+        if st.form_submit_button("Save profile"):
+            memory.set_profile(con, uid, diet=diet, allergies=allergies)
+            st.success("Saved.")
+
+
 def render_chat() -> None:
+    st.caption(
+        "Ask about a food additive or a product. Answers are cited from regulators "
+        "(EU, US FDA, California, IARC), keep legal status, hazard and harm separate, "
+        "and never give medical advice."
+    )
     if "messages" not in st.session_state:
         st.session_state.messages = []
 
@@ -203,6 +252,37 @@ def render_chat() -> None:
     _suggestion_chips()
 
 
+@st.dialog("Product details", width="large")
+def _show_details(p: dict) -> None:
+    top = st.columns([1, 2])
+    with top[0]:
+        if p["image"]:
+            st.image(p["image"], use_container_width=True)
+        else:
+            st.markdown("<div style='font-size:4rem;text-align:center'>🍬</div>",
+                        unsafe_allow_html=True)
+    with top[1]:
+        st.subheader(p["name"])
+        if p["brands"]:
+            st.caption(f"Brand: {p['brands']}")
+        if p["categories"]:
+            st.caption(p["categories"].replace("en:", "").replace(",", ", "))
+
+    st.markdown("**Additives**")
+    names = _additive_names()
+    for t in (p["additives"] or "").split(","):
+        e = t.split(":")[-1].upper()
+        if e:
+            nm = names.get(e)
+            st.markdown(f"- **{e}**" + (f" — {nm}" if nm else " — (not in our slice)"))
+
+    if p["ingredients"]:
+        st.markdown("**Ingredients**")
+        st.write(p["ingredients"])
+    if p["off_url"]:
+        st.markdown(f"[View on Open Food Facts ↗]({p['off_url']})")
+
+
 def render_pantry() -> None:
     con, uid = _con(), _user_id()
     products = _products()
@@ -212,7 +292,7 @@ def render_pantry() -> None:
     mine = [p for p in products if p["barcode"] in in_pantry]
     if mine:
         _product_grid(mine, in_pantry, key_prefix="pantry")
-        st.caption("Then switch to **Chat** and ask: *Across the candy I've logged, is anything banned or restricted anywhere?*")
+        st.caption("Then open **Chat** and ask: *Across the candy I've logged, is anything banned or restricted anywhere?*")
     else:
         st.caption("Your pantry is empty. Add candies from the catalogue below.")
 
@@ -220,7 +300,7 @@ def render_pantry() -> None:
     st.subheader("Browse products")
     query = st.text_input("Search", placeholder="Search by name…", label_visibility="collapsed")
     shown = [p for p in products if query.lower() in p["name"].lower()] if query else products
-    st.caption(f"{len(shown)} product{'s' if len(shown) != 1 else ''}")
+    st.caption(f"{len(shown)} product{'s' if len(shown) != 1 else ''} · click a name for details")
     _product_grid(shown, in_pantry, key_prefix="browse")
 
 
@@ -229,6 +309,7 @@ def _product_grid(items: list[dict], in_pantry: set[str], *, key_prefix: str,
     con, uid = _con(), _user_id()
     columns = st.columns(cols)
     for i, p in enumerate(items):
+        bc = p["barcode"]
         with columns[i % cols], st.container(border=True):
             if p["image"]:
                 st.image(p["image"], use_container_width=True)
@@ -237,16 +318,17 @@ def _product_grid(items: list[dict], in_pantry: set[str], *, key_prefix: str,
                     "<div style='height:110px;display:flex;align-items:center;"
                     "justify-content:center;font-size:3rem'>🍬</div>",
                     unsafe_allow_html=True)
-            st.markdown(f"**{p['name'][:42]}**")
-            st.caption(_codes(p["additives"]) or "additives not on file")
-            bc = p["barcode"]
+            # The product name is a link-style button that opens the detail overlay.
+            if st.button(p["name"][:42], key=f"{key_prefix}_info_{bc}",
+                         type="tertiary", use_container_width=True):
+                _show_details(p)
             if bc in in_pantry:
-                if st.button("✓ In pantry — remove", key=f"{key_prefix}_rm_{bc}",
+                if st.button("Remove from Pantry", key=f"{key_prefix}_rm_{bc}",
                              use_container_width=True):
                     memory.remove_product(con, uid, bc)
                     st.rerun()
-            elif st.button("＋ Add to pantry", key=f"{key_prefix}_add_{bc}",
-                           use_container_width=True):
+            elif st.button("＋ Add to Pantry", key=f"{key_prefix}_add_{bc}",
+                           type="primary", use_container_width=True):
                 memory.log_product(con, uid, barcode=bc, name=p["name"])
                 st.rerun()
 
@@ -255,8 +337,7 @@ def _suggestion_chips() -> None:
     """Show a few starter questions, always. Using one rotates in a fresh one.
 
     Rendered on every run (never conditional), so a visible chip is always
-    instantiated on the run its click is processed: no dropped clicks. Below the
-    conversation and above the input, so it reads as a suggestion row.
+    instantiated on the run its click is processed: no dropped clicks.
     """
     used = st.session_state.setdefault("used_examples", [])
     show = [q for q in EXAMPLE_POOL if q not in used][:CHIPS_SHOWN]
