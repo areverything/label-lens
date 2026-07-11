@@ -2,11 +2,14 @@
 
 The chat UI shows this so anyone (no background in AI, food additives, or
 regulation needed) can see what the app did to answer: which official source it
-checked, what it found, and why that step matters. Every line is derived from the
-real messages the agent produced, not narrated after the fact.
+checked, HOW it retrieved the information (which tool, and the method behind it),
+what it found, and why that step matters. Every line is derived from the real
+messages the agent produced, not narrated after the fact.
 
-Each step is a dict: {icon, title, lines, note, final}. `title` is the plain
-action, `lines` are the plain results, `note` is an optional "why it matters".
+Each step is a dict: {icon, title, tool, query, how, lines, note, final}.
+`title` is the plain action; `tool`/`query`/`how` are the mechanism (the tool the
+agent called and how it retrieved the data); `lines` are the plain results;
+`note` is an optional "why it matters".
 """
 from __future__ import annotations
 
@@ -38,9 +41,10 @@ _STATUS = {
 }
 
 
-def _step(icon: str, title: str, lines: list[str], note: str = "",
-          final: bool = False) -> dict:
-    return {"icon": icon, "title": title, "lines": lines, "note": note, "final": final}
+def _step(icon: str, title: str, lines: list[str], note: str = "", *,
+          tool: str = "", query: str = "", how: str = "", final: bool = False) -> dict:
+    return {"icon": icon, "title": title, "tool": tool, "query": query, "how": how,
+            "lines": lines, "note": note, "final": final}
 
 
 def summarize_run(messages: list, reply: str) -> list[dict]:
@@ -69,19 +73,21 @@ def summarize_run(messages: list, reply: str) -> list[dict]:
             build = builders.get(tc.get("name", ""))
             if build:
                 steps.append(build(arg, content))
-    steps.append(_answer_step(reply))
+    steps.append(_answer_step(reply, tool_calls=bool(steps)))
     return steps
 
 
 def _store_step(term: str, content: str) -> dict:
     title = f"Looked up the official rulings on “{term}”"
+    how = "Database lookup in the additive rulings table (DuckDB)"
+    kw = {"tool": "additive_status", "query": term, "how": how}
     low = content.lower()
     if "no additive found" in low:
         return _step("⚖️", title, ["We don’t have this additive in our data yet."],
-                     "When data is missing, the app says so instead of guessing.")
+                     "When data is missing, the app says so instead of guessing.", **kw)
     if "no regulatory-status rows" in low:
         return _step("⚖️", title, ["No official rulings recorded for it yet."],
-                     "When data is missing, the app says so instead of guessing.")
+                     "When data is missing, the app says so instead of guessing.", **kw)
     legal, hazard, statuses = [], [], set()
     for line in content.splitlines():
         line = line.strip()
@@ -99,46 +105,53 @@ def _store_step(term: str, content: str) -> dict:
     if len(statuses) > 1:
         note = ("Regulators reached different decisions here. The app shows each "
                 "one rather than picking a winner.")
-    return _step("⚖️", title, legal + hazard, note)
+    return _step("⚖️", title, legal + hazard, note, **kw)
 
 
 def _rag_step(term: str, content: str) -> dict:
     title = f"Read the evidence notes about “{term}”"
+    how = ("AI semantic search (RAG): turned the query into a vector and matched "
+           "the closest brief passages in the vector index (Chroma + bge-small)")
+    kw = {"tool": "search_briefs", "query": term, "how": how}
     if "no brief passages" in content.lower():
         return _step("📚", title, ["No evidence notes matched this."],
-                     "When there’s nothing to cite, the app says so instead of guessing.")
+                     "When there’s nothing to cite, the app says so instead of guessing.", **kw)
     n = sum(1 for ln in content.splitlines() if ln.startswith("["))
     return _step("📚", title,
                  [f"Pulled the {n} most relevant passage{'s' if n != 1 else ''} "
                   "to explain the “why”."],
-                 "These are curated notes from regulators and studies, not a web search.")
+                 "These are curated notes from regulators and studies, not a web search.", **kw)
 
 
 def _recalls_step(term: str, content: str) -> dict:
     title = f"Checked for active recalls of “{term}”"
+    how = "Live web API call to openFDA (api.fda.gov)"
+    kw = {"tool": "check_recalls", "query": term, "how": how}
     low = content.lower()
     if "could not reach" in low:
-        return _step("🚨", title, ["Couldn’t reach the FDA recall service just now."])
+        return _step("🚨", title, ["Couldn’t reach the FDA recall service just now."], **kw)
     note = "This is a live check with the FDA right now, not a saved answer."
     if "no openfda food recalls" in low:
-        return _step("🚨", title, ["No active recalls right now."], note)
+        return _step("🚨", title, ["No active recalls right now."], note, **kw)
     n = sum(1 for ln in content.splitlines() if ln.strip().startswith("- "))
-    return _step("🚨", title, [f"Found {n} active recall{'s' if n != 1 else ''}."], note)
+    return _step("🚨", title, [f"Found {n} active recall{'s' if n != 1 else ''}."], note, **kw)
 
 
 def _actions_step(term: str, content: str) -> dict:
     title = f"Checked for recent government action on “{term}”"
+    how = "Live web API call to the US Federal Register (federalregister.gov)"
+    kw = {"tool": "recent_regulatory_actions", "query": term, "how": how}
     low = content.lower()
     if "could not reach" in low:
-        return _step("📰", title, ["Couldn’t reach the government service just now."])
+        return _step("📰", title, ["Couldn’t reach the government service just now."], **kw)
     note = "This is a live check of the US Federal Register, not a saved answer."
     if "no recent federal register" in low:
-        return _step("📰", title, ["No recent action found."], note)
+        return _step("📰", title, ["No recent action found."], note, **kw)
     n = sum(1 for ln in content.splitlines() if ln.strip().startswith("- "))
-    return _step("📰", title, [f"Found {n} recent official document{'s' if n != 1 else ''}."], note)
+    return _step("📰", title, [f"Found {n} recent official document{'s' if n != 1 else ''}."], note, **kw)
 
 
-def _answer_step(reply: str) -> dict:
+def _answer_step(reply: str, *, tool_calls: bool) -> dict:
     low = (reply or "").lower()
     lines = ["Every fact above is cited from the source that stated it."]
     if any(k in low for k in (
@@ -152,4 +165,7 @@ def _answer_step(reply: str) -> dict:
         "not proven harmful", "isn’t the same", "isn't the same",
     )):
         lines.append("It keeps “banned somewhere” separate from “proven harmful”.")
-    return _step("✅", "Wrote the answer", lines, final=True)
+    how = ("The AI wrote the answer from the results above"
+           if tool_calls else
+           "The AI answered directly, without calling any tool")
+    return _step("✅", "Wrote the answer", lines, how=how, final=True)

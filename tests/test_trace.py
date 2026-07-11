@@ -38,14 +38,42 @@ def test_store_step_is_plain_and_flags_divergence():
     ]
     steps = summarize_run(msgs, msgs[-1].content)
     store = steps[0]
-    # No function-call syntax, no jargon codes in what the user sees.
+    # The headline is plain English (no function-call syntax, no jargon codes)...
     assert "additive_status(" not in _text(store)
     assert "European Union: Banned" in store["lines"]
     assert "US FDA: Allowed" in store["lines"]
     assert "different decisions" in store["note"]
-    # Closing answer step is marked final and notes the citation.
+    # ...but the mechanism is exposed separately: the tool name and how it ran.
+    assert store["tool"] == "additive_status"
+    assert store["query"] == "titanium dioxide"
+    assert "DuckDB" in store["how"]
+    # Closing answer step is marked final, notes the citation, and says the AI
+    # composed it (a tool ran upstream).
     assert steps[-1]["final"] is True
     assert any("cited" in line for line in steps[-1]["lines"])
+    assert "wrote the answer from the results" in steps[-1]["how"].lower()
+
+
+def test_each_lane_reports_its_tool_and_retrieval_method():
+    cases = [
+        ("search_briefs", "query", "titanium dioxide",
+         "[Titanium dioxide — Evidence]\ntext", "search_briefs", "RAG"),
+        ("check_recalls", "term", "Red 3",
+         "No openFDA food recalls found mentioning 'Red 3'.", "check_recalls", "openFDA"),
+        ("recent_regulatory_actions", "term", "Red 3",
+         "No recent Federal Register documents found for 'Red 3'.",
+         "recent_regulatory_actions", "Federal Register"),
+    ]
+    for tool, argname, arg, content, want_tool, want_how in cases:
+        msgs = [
+            _ai([{"name": tool, "args": {argname: arg}, "id": "x"}]),
+            _tool("x", content),
+            _final("An answer [cite]."),
+        ]
+        step = summarize_run(msgs, msgs[-1].content)[0]
+        assert step["tool"] == want_tool
+        assert step["query"] == arg
+        assert want_how in step["how"]
 
 
 def test_iarc_hazard_is_worded_apart_from_legal_status():
@@ -69,7 +97,10 @@ def test_rag_step_counts_passages_without_jargon():
     ]
     rag = summarize_run(msgs, msgs[-1].content)[0]
     assert "2 most relevant passages" in _text(rag)
-    assert "RAG" not in _text(rag)
+    # The plain result/headline stays jargon-free; "RAG" only appears in the
+    # separate mechanism line.
+    assert "RAG" not in rag["title"] and not any("RAG" in ln for ln in rag["lines"])
+    assert "RAG" in rag["how"]
 
 
 def test_safety_refusal_line_is_present():

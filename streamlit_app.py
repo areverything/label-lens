@@ -450,8 +450,28 @@ def _product_grid(items: list[dict], in_pantry: set[str], *, key_prefix: str,
 # Both read the same trace, so they show what actually ran.
 
 
+def _tool_html(step: dict) -> str:
+    """The muted "how it was retrieved" line: the tool called and the method.
+
+    Names the exact tool so the tool use is visible, then a plain description of
+    the retrieval method (database lookup, RAG search, live API, or none)."""
+    how = step.get("how") or ""
+    tool, query = step.get("tool"), step.get("query")
+    if tool:
+        call = f'{tool}("{query}")' if query else tool
+        mech = (f'<code style="font-size:0.78rem;color:#c9a86a">{html.escape(call)}'
+                f'</code> · {html.escape(how)}')
+    elif how:
+        mech = html.escape(how)
+    else:
+        return ""
+    return (f'<div style="color:#8a8f98;font-size:0.79rem;line-height:1.4;'
+            f'padding-left:1.9rem;margin-top:2px">🔧 {mech}</div>')
+
+
 def _steps_html(trace: list[dict]) -> str:
-    """Render the ordered steps: numbered actions, plain results, why-it-matters."""
+    """Render the ordered steps: numbered actions, how it was retrieved (tool),
+    plain results, and a why-it-matters note."""
     parts, n = [], 0
     for s in trace:
         if s.get("final"):
@@ -471,7 +491,7 @@ def _steps_html(trace: list[dict]) -> str:
         parts.append(
             f'<div style="margin:0.7rem 0">'
             f'<div style="font-weight:600;font-size:0.94rem">{marker} '
-            f'{html.escape(s["title"])}</div>{body}{note}</div>')
+            f'{html.escape(s["title"])}</div>{_tool_html(s)}{body}{note}</div>')
     return "".join(parts)
 
 
@@ -483,7 +503,8 @@ def _trace_expander(trace: list[dict] | None) -> None:
     label = f"🔍 How it found this answer · {n} step{'s' if n != 1 else ''}"
     with st.expander(label, expanded=False):
         st.caption("Label Lens answers by checking official sources one step at a "
-                   "time. Here's exactly what it did:")
+                   "time. Each step below shows what it did, the 🔧 tool it used "
+                   "and how it retrieved the information, and what it found:")
         st.markdown(_steps_html(trace), unsafe_allow_html=True)
 
 
