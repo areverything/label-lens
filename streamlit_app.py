@@ -57,9 +57,15 @@ html { font-size: 18px; }
 div[class*="_rm_"] button { background-color:#e05656 !important; border-color:#e05656 !important; color:#fff !important; }
 div[class*="_rm_"] button:hover { background-color:#c94444 !important; border-color:#c94444 !important; }
 
-/* Real fixed header bar across the top of the screen. */
+/* Real fixed header bar across the top of the screen.
+   Streamlit stacks the sidebar (z 999991) and its own header (z 999990) above
+   normal content, both with opaque backgrounds, so a plain fixed bar gets
+   painted over. Fix: lift our bar above the sidebar (999992); keep Streamlit's
+   header above ours (999993) but make it transparent and click-through so its
+   Share/menu buttons still show and work while its background no longer hides
+   our bar and its body no longer blocks clicks on our tabs. */
 .st-key-ll_header {
-  position: fixed; top: 0; left: 0; right: 0; z-index: 999980;
+  position: fixed; top: 0; left: 0; right: 0; z-index: 999992;
   background: var(--background-color, #0e1117);
   border-bottom: 1px solid rgba(128,128,128,0.28);
   min-height: 3.75rem; padding: 0.25rem 1.25rem;
@@ -67,6 +73,8 @@ div[class*="_rm_"] button:hover { background-color:#c94444 !important; border-co
 }
 .st-key-ll_header > div { width: 100%; }
 .st-key-ll_header [data-testid="stHorizontalBlock"] { align-items: center; }
+[data-testid="stHeader"] { background: transparent !important; z-index: 999993 !important; pointer-events: none; }
+[data-testid="stToolbar"] { pointer-events: auto; }
 /* Push the page and the sidebar content down below the fixed header. */
 [data-testid="stMainBlockContainer"], .block-container { padding-top: 5rem !important; }
 [data-testid="stSidebarUserContent"] { padding-top: 3.25rem; }
@@ -234,8 +242,8 @@ def _header() -> str:
         left, mid, _right = st.columns([3, 4, 2], vertical_alignment="center")
         with left:
             st.markdown(
-                "<span style='font-size:1.5rem;font-weight:700;white-space:nowrap'>"
-                "🔎 Label Lens</span>", unsafe_allow_html=True)
+                "<span style='font-size:1.5rem;font-weight:700;white-space:nowrap;"
+                "color:#eaecf2'>🔎 Label Lens</span>", unsafe_allow_html=True)
         with mid:
             view = st.segmented_control(
                 "view", ["💬 Chat", "🧺 Pantry", "👤 Profile"], default="💬 Chat",
