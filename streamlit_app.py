@@ -44,10 +44,11 @@ from label_lens.rag.index import ensure_index  # noqa: E402
 
 st.set_page_config(page_title="Label Lens", page_icon="🔎", layout="centered")
 
-# Bigger base text, a header underline, and red "Remove from Pantry" buttons
-# (their widget keys contain "_rm_", which Streamlit exposes as an st-key- class).
-# The developer chrome (Clear cache etc.) is handled by toolbarMode in
-# .streamlit/config.toml, not here.
+# A real top header (logo + tabs pinned to the top of the viewport, aligned with
+# Streamlit's own toolbar so Share/menu stay on the right), bigger base text, and
+# red "Remove from Pantry" buttons (their widget keys contain "_rm_", which
+# Streamlit exposes as an st-key- class). The developer chrome (Clear cache etc.)
+# is handled by toolbarMode in .streamlit/config.toml, not here.
 st.markdown("""
 <style>
 html { font-size: 18px; }
@@ -55,6 +56,20 @@ html { font-size: 18px; }
 .stMarkdown p, [data-testid="stChatMessageContent"] p { font-size: 1.03rem; line-height: 1.55; }
 div[class*="_rm_"] button { background-color:#e05656 !important; border-color:#e05656 !important; color:#fff !important; }
 div[class*="_rm_"] button:hover { background-color:#c94444 !important; border-color:#c94444 !important; }
+
+/* Real fixed header bar across the top of the screen. */
+.st-key-ll_header {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 999980;
+  background: var(--background-color, #0e1117);
+  border-bottom: 1px solid rgba(128,128,128,0.28);
+  min-height: 3.75rem; padding: 0.25rem 1.25rem;
+  display: flex; align-items: center;
+}
+.st-key-ll_header > div { width: 100%; }
+.st-key-ll_header [data-testid="stHorizontalBlock"] { align-items: center; }
+/* Push the page and the sidebar content down below the fixed header. */
+[data-testid="stMainBlockContainer"], .block-container { padding-top: 5rem !important; }
+[data-testid="stSidebarUserContent"] { padding-top: 3.25rem; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -209,16 +224,22 @@ def main() -> None:
 
 
 def _header() -> str:
-    """A header row: name+icon on the left, the tabs in the middle. The Share
-    button and menu are Streamlit's own, pinned top-right by the toolbar."""
-    left, mid, _right = st.columns([3, 4, 1], vertical_alignment="center")
-    with left:
-        st.markdown("## 🔎 Label Lens")
-    with mid:
-        view = st.segmented_control(
-            "view", ["💬 Chat", "🧺 Pantry", "👤 Profile"], default="💬 Chat",
-            key="view", label_visibility="collapsed")
-    st.divider()
+    """A real header bar pinned to the top of the screen: name+icon on the left,
+    the tabs in the middle. The right column is a spacer that keeps the tabs clear
+    of Streamlit's own Share button and menu, which the toolbar pins top-right.
+
+    The `key="ll_header"` gives the container an `st-key-ll_header` class that the
+    CSS above uses to fix it to the top of the viewport."""
+    with st.container(key="ll_header"):
+        left, mid, _right = st.columns([3, 4, 2], vertical_alignment="center")
+        with left:
+            st.markdown(
+                "<span style='font-size:1.5rem;font-weight:700;white-space:nowrap'>"
+                "🔎 Label Lens</span>", unsafe_allow_html=True)
+        with mid:
+            view = st.segmented_control(
+                "view", ["💬 Chat", "🧺 Pantry", "👤 Profile"], default="💬 Chat",
+                key="view", label_visibility="collapsed")
     return view or "💬 Chat"
 
 
