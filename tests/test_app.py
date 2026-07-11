@@ -92,12 +92,23 @@ def test_no_password_secret_leaves_app_open():
     assert len(at.chat_input) == 1  # open, chat available
 
 
-def test_example_chips_do_not_linger_after_answering():
-    """Regression: chips rendered before the answer was appended lingered one
-    render, then swallowed the next click and re-showed the old Q&A."""
+def _chips(at):
+    """The suggestion-chip labels (excluding the sidebar and login buttons)."""
+    other = {"Save profile", "Log product", "Enter"}
+    return [b.label for b in at.button if b.label not in other]
+
+
+def test_example_chips_persist_and_rotate_after_use():
+    """Chips stay visible after answering, and a used one is replaced by a fresh
+    one (the click is never dropped because the chip block always renders)."""
     at = AppTest.from_file(APP).run(timeout=30)
+    before = _chips(at)
+    assert EX0 in before
+    n = len(before)
+
     at.button(key="ex0").click().run(timeout=30)
     assert not at.exception
-    # Once a question is answered, the starter chips must be gone, so a later
-    # click cannot land on a stale button whose handler no longer runs.
-    assert EX0 not in [b.label for b in at.button]
+    after = _chips(at)
+    assert len(after) == n          # row stays full: a fresh chip rotated in
+    assert EX0 not in after         # the used chip is gone
+    assert set(after) - set(before) # at least one new question appeared

@@ -49,12 +49,21 @@ def _warm() -> bool:
     ensure_index()
     return True
 
-EXAMPLES = [
+# A pool of starter questions across the three lanes. Four are shown at a time;
+# using one rotates in the next unused one, so the suggestions stay fresh.
+EXAMPLE_POOL = [
     "Is E171 (titanium dioxide) banned in the EU?",
     "Why did the EU ban titanium dioxide, and does that mean it's dangerous?",
     "Is Red 40 sketchy?",
     "Has the FDA taken any recent action on erythrosine (Red 3)?",
+    "Is aspartame a carcinogen?",
+    "Is Red 3 banned in California?",
+    "Why is sodium nitrite in cured meat controversial?",
+    "Is potassium bromate allowed in US food?",
+    "What does the EU require for FD&C Yellow 6?",
+    "Are there any recent recalls involving food dyes?",
 ]
+CHIPS_SHOWN = 4
 
 
 @st.cache_resource
@@ -149,21 +158,10 @@ def main() -> None:
     if "messages" not in st.session_state:
         st.session_state.messages = []
 
-    # Resolve the prompt first (a pending example-click, else freshly typed input).
+    # Resolve the prompt (a pending chip-click, else freshly typed input).
     # chat_input is always rendered; it pins to the bottom and never drops a click.
     typed = st.chat_input("Ask about an additive or product...")
     prompt = st.session_state.pop("pending", None) or typed
-
-    # Starter chips only on the empty state and only when not already answering, so
-    # they vanish cleanly on the first question and never linger into a later run
-    # where the block is skipped and a click on a stale chip would be lost.
-    if not st.session_state.messages and not prompt:
-        st.write("**Try one of these:**")
-        cols = st.columns(2)
-        for i, ex in enumerate(EXAMPLES):
-            if cols[i % 2].button(ex, key=f"ex{i}"):
-                st.session_state.pending = ex
-                st.rerun()
 
     for m in st.session_state.messages:
         st.chat_message(m["role"]).markdown(m["content"])
@@ -178,6 +176,28 @@ def main() -> None:
                 reply = f"Something went wrong: {e}"
             st.markdown(reply)
         st.session_state.messages.append({"role": "assistant", "content": reply})
+
+    _suggestion_chips()
+
+
+def _suggestion_chips() -> None:
+    """Show a few starter questions, always. Using one rotates in a fresh one.
+
+    Rendered on every run (never conditional), so a visible chip is always
+    instantiated on the run its click is processed: no dropped clicks. Below the
+    conversation and above the input, so it reads as a suggestion row.
+    """
+    used = st.session_state.setdefault("used_examples", [])
+    show = [q for q in EXAMPLE_POOL if q not in used][:CHIPS_SHOWN]
+    if not show:
+        return
+    st.caption("Try one of these:")
+    cols = st.columns(2)
+    for i, ex in enumerate(show):
+        if cols[i % 2].button(ex, key=f"ex{i}"):
+            used.append(ex)
+            st.session_state.pending = ex
+            st.rerun()
 
 
 if __name__ == "__main__":
