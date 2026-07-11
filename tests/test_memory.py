@@ -6,7 +6,7 @@ import pytest
 
 from label_lens.agent.memory import (
     ensure_memory_tables, get_log, get_log_with_additives, get_profile,
-    log_product, set_profile,
+    log_product, remove_product, set_profile,
 )
 
 
@@ -46,6 +46,14 @@ def test_product_log_accumulates_in_order(con):
 def test_log_is_per_user(con):
     log_product(con, "u1", barcode="111", name="Gummy Bears")
     assert get_log(con, "u2") == []
+
+
+def test_remove_product_takes_it_out_of_the_pantry(con):
+    log_product(con, "u1", barcode="111", name="Gummy Bears")
+    log_product(con, "u1", barcode="222", name="Red Licorice")
+    remove_product(con, "u1", "111")
+    names = [r["name"] for r in get_log(con, "u1")]
+    assert names == ["Red Licorice"]
 
 
 def test_log_with_additives_joins_real_product_tags(con):

@@ -92,6 +92,25 @@ def test_no_password_secret_leaves_app_open():
     assert len(at.chat_input) == 1  # open, chat available
 
 
+def test_pantry_add_and_remove_a_product():
+    from label_lens.agent import memory
+    from label_lens.agent.tools import _con
+    SKITTLES = "0072392328307"  # a real product with additives + image
+
+    at = AppTest.from_file(APP)
+    at.session_state["view"] = "🧺 Pantry"
+    at.run(timeout=60)
+    assert not at.exception
+    uid = at.session_state["user_id"]
+    con = _con()
+
+    at.button(key=f"browse_add_{SKITTLES}").click().run(timeout=60)
+    assert SKITTLES in {r["barcode"] for r in memory.get_log(con, uid)}
+
+    at.button(key=f"browse_rm_{SKITTLES}").click().run(timeout=60)
+    assert SKITTLES not in {r["barcode"] for r in memory.get_log(con, uid)}
+
+
 def _chips(at):
     """The suggestion-chip labels (excluding the sidebar and login buttons)."""
     other = {"Save profile", "Log product", "Enter"}

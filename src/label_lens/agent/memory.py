@@ -65,6 +65,12 @@ def log_product(con: duckdb.DuckDBPyConnection, user_id: str, *,
         [user_id, barcode, name, _now()])
 
 
+def remove_product(con: duckdb.DuckDBPyConnection, user_id: str, barcode: str) -> None:
+    """Remove a product from the user's pantry (all log rows for that barcode)."""
+    con.execute("DELETE FROM product_log WHERE user_id = ? AND barcode = ?",
+                [user_id, barcode])
+
+
 def get_log(con: duckdb.DuckDBPyConnection, user_id: str) -> list[dict]:
     return [
         {"barcode": b, "name": n, "logged_at": t}

@@ -67,13 +67,23 @@ CHIPS_SHOWN = 4
 
 
 @st.cache_resource
-def _products() -> list[tuple[str, str]]:
-    """(name, barcode) for every product with additives, for the log picker."""
+def _products() -> list[dict]:
+    """Every product with additives: name, barcode, image URL, additive tags."""
     rows = _con().execute(
-        """SELECT name, barcode FROM product
+        """SELECT name, barcode, image_url, additives_tags FROM product
            WHERE name IS NOT NULL AND additives_tags <> ''
            ORDER BY name""").fetchall()
-    return [(n, b) for n, b in rows]
+    return [{"name": n, "barcode": b, "image": img, "additives": tags}
+            for n, b, img, tags in rows]
+
+
+def _codes(additives_tags: str) -> str:
+    """'en:e171,en:e102' -> 'E171, E102' for display."""
+    return ", ".join(t.split(":")[-1].upper() for t in (additives_tags or "").split(",") if t)
+
+
+def _pantry_barcodes(con, uid: str) -> set[str]:
+    return {r["barcode"] for r in memory.get_log_with_additives(con, uid)}
 
 
 def _user_id() -> str:
@@ -124,23 +134,11 @@ def sidebar() -> None:
                 memory.set_profile(con, uid, diet=diet, allergies=allergies)
                 st.success("Saved.")
 
-        st.header("Log a product")
-        st.caption("Log candies you eat; then ask cumulative questions about their additives.")
-        products = _products()
-        label = st.selectbox("Product", options=[p[0] for p in products], index=None,
-                             placeholder="Search products...")
-        if st.button("Log product", disabled=label is None):
-            barcode = dict(products)[label]
-            memory.log_product(con, uid, barcode=barcode, name=label)
-            st.success(f"Logged {label}.")
-
-        logged = memory.get_log_with_additives(con, uid)
-        if logged:
-            st.subheader("Logged so far")
-            for r in logged:
-                codes = ", ".join(t.split(":")[-1].upper()
-                                  for t in r["additives"].split(",") if t)
-                st.markdown(f"**{r['name']}** — {codes or 'additives not on file'}")
+        pantry = memory.get_log_with_additives(con, uid)
+        st.header(f"Pantry ({len(pantry)})")
+        st.caption("Build your pantry in the **Pantry** tab, then ask cumulative questions in **Chat**.")
+        for r in pantry:
+            st.markdown(f"**{r['name']}** — {_codes(r['additives']) or 'additives not on file'}")
 
 
 def main() -> None:
@@ -155,6 +153,16 @@ def main() -> None:
     _warm()
     sidebar()
 
+    view = st.segmented_control(
+        "view", ["💬 Chat", "🧺 Pantry"], default="💬 Chat",
+        key="view", label_visibility="collapsed")
+    if view == "🧺 Pantry":
+        render_pantry()
+    else:
+        render_chat()
+
+
+def render_chat() -> None:
     if "messages" not in st.session_state:
         st.session_state.messages = []
 
@@ -178,6 +186,54 @@ def main() -> None:
         st.session_state.messages.append({"role": "assistant", "content": reply})
 
     _suggestion_chips()
+
+
+def render_pantry() -> None:
+    con, uid = _con(), _user_id()
+    products = _products()
+    in_pantry = _pantry_barcodes(con, uid)
+
+    st.subheader(f"🧺 Your pantry ({len(in_pantry)})")
+    mine = [p for p in products if p["barcode"] in in_pantry]
+    if mine:
+        _product_grid(mine, in_pantry, key_prefix="pantry")
+        st.caption("Then switch to **Chat** and ask: *Across the candy I've logged, is anything banned or restricted anywhere?*")
+    else:
+        st.caption("Your pantry is empty. Add candies from the catalogue below.")
+
+    st.divider()
+    st.subheader("Browse products")
+    query = st.text_input("Search", placeholder="Search by name…", label_visibility="collapsed")
+    shown = [p for p in products if query.lower() in p["name"].lower()] if query else products
+    st.caption(f"{len(shown)} product{'s' if len(shown) != 1 else ''}")
+    _product_grid(shown, in_pantry, key_prefix="browse")
+
+
+def _product_grid(items: list[dict], in_pantry: set[str], *, key_prefix: str,
+                  cols: int = 4) -> None:
+    con, uid = _con(), _user_id()
+    columns = st.columns(cols)
+    for i, p in enumerate(items):
+        with columns[i % cols], st.container(border=True):
+            if p["image"]:
+                st.image(p["image"], use_container_width=True)
+            else:
+                st.markdown(
+                    "<div style='height:110px;display:flex;align-items:center;"
+                    "justify-content:center;font-size:3rem'>🍬</div>",
+                    unsafe_allow_html=True)
+            st.markdown(f"**{p['name'][:42]}**")
+            st.caption(_codes(p["additives"]) or "additives not on file")
+            bc = p["barcode"]
+            if bc in in_pantry:
+                if st.button("✓ In pantry — remove", key=f"{key_prefix}_rm_{bc}",
+                             use_container_width=True):
+                    memory.remove_product(con, uid, bc)
+                    st.rerun()
+            elif st.button("＋ Add to pantry", key=f"{key_prefix}_add_{bc}",
+                           use_container_width=True):
+                memory.log_product(con, uid, barcode=bc, name=p["name"])
+                st.rerun()
 
 
 def _suggestion_chips() -> None:
