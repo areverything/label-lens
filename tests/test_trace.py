@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from label_lens.agent.trace import summarize_run
+from label_lens.agent.trace import agent_info, summarize_run
 
 
 def _ai(tool_calls):
@@ -46,7 +46,7 @@ def test_store_step_is_plain_and_flags_divergence():
     # ...but the mechanism is exposed separately: the tool name and how it ran.
     assert store["tool"] == "additive_status"
     assert store["query"] == "titanium dioxide"
-    assert "DuckDB" in store["how"]
+    assert "DuckDB" in store["tech"]["call"]
     # Closing answer step is marked final, notes the citation, and says the AI
     # composed it (a tool ran upstream).
     assert steps[-1]["final"] is True
@@ -64,7 +64,7 @@ def test_each_lane_reports_its_tool_and_retrieval_method():
          "No recent Federal Register documents found for 'Red 3'.",
          "recent_regulatory_actions", "Federal Register"),
     ]
-    for tool, argname, arg, content, want_tool, want_how in cases:
+    for tool, argname, arg, content, want_tool, want_technique in cases:
         msgs = [
             _ai([{"name": tool, "args": {argname: arg}, "id": "x"}]),
             _tool("x", content),
@@ -73,7 +73,37 @@ def test_each_lane_reports_its_tool_and_retrieval_method():
         step = summarize_run(msgs, msgs[-1].content)[0]
         assert step["tool"] == want_tool
         assert step["query"] == arg
-        assert want_how in step["how"]
+        # The technique name (RAG / openFDA / Federal Register) is on the tech block.
+        assert want_technique in step["tech"]["technique"]
+
+
+def test_reviewer_technical_detail_carries_technique_and_exact_call():
+    msgs = [
+        _ai([{"name": "search_briefs", "args": {"query": "titanium dioxide"}, "id": "a"}]),
+        _tool("a", "[Titanium dioxide — Evidence]\ntext"),
+        _final("Because EFSA flagged genotoxicity [EFSA]."),
+    ]
+    rag = summarize_run(msgs, msgs[-1].content)[0]
+    assert "RAG" in rag["tech"]["technique"]
+    # The exact call names the vector store, the query term, k, and the model.
+    assert "similarity_search_with_score" in rag["tech"]["call"]
+    assert 'titanium dioxide' in rag["tech"]["call"]
+    assert "k=4" in rag["tech"]["call"]
+    assert "bge-small" in rag["tech"]["call"]
+
+    # openFDA step exposes the real endpoint and query field.
+    recall = summarize_run([
+        _ai([{"name": "check_recalls", "args": {"term": "Red 3"}, "id": "b"}]),
+        _tool("b", "No openFDA food recalls found mentioning 'Red 3'."),
+        _final("No recalls [cite]."),
+    ], "No recalls [cite].")[0]
+    assert "api.fda.gov/food/enforcement.json" in recall["tech"]["call"]
+
+
+def test_agent_info_names_framework_and_model():
+    info = agent_info()
+    assert "create_react_agent" in info["framework"]
+    assert "OpenRouter" in info["model"]
 
 
 def test_iarc_hazard_is_worded_apart_from_legal_status():

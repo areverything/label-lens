@@ -1,21 +1,27 @@
-"""Turn one agent run into a plain-English, step-by-step activity trace.
+"""Turn one agent run into a step-by-step activity trace for two audiences.
 
-The chat UI shows this so anyone (no background in AI, food additives, or
-regulation needed) can see what the app did to answer: which official source it
-checked, HOW it retrieved the information (which tool, and the method behind it),
-what it found, and why that step matters. Every line is derived from the real
-messages the agent produced, not narrated after the fact.
+The chat UI shows this so a shopper with no background in AI or additives can see
+what the app did, AND a certification reviewer can see exactly how: the technique
+used and the concrete call made (SQL query, RAG vector search, or live API
+request). Every line is derived from the real messages the agent produced.
 
-Each step is a dict: {icon, title, tool, query, how, lines, note, final}.
-`title` is the plain action; `tool`/`query`/`how` are the mechanism (the tool the
-agent called and how it retrieved the data); `lines` are the plain results;
-`note` is an optional "why it matters".
+Each step is a dict:
+  {icon, title, tool, query, how, lines, note, tech, final}
+- title: the plain-English action (for the shopper).
+- tool/query/how: the tool called and a plain description of the method.
+- tech: {technique, call} — the precise technique and call (for the reviewer).
+- lines: the plain results. note: an optional "why it matters".
 """
 from __future__ import annotations
+
+import os
 
 # Em dash (U+2014) as an escape so the source carries no literal em dash. The
 # tool outputs use it as a field separator; we split on it to parse them.
 _EMDASH = " — "
+
+# The embedding model behind the RAG lane (see rag/embed.py). Shown to reviewers.
+_EMBED_MODEL = "BAAI/bge-small-en-v1.5"
 
 # Regulator codes -> names a newcomer can read.
 _JURIS = {
@@ -42,13 +48,24 @@ _STATUS = {
 
 
 def _step(icon: str, title: str, lines: list[str], note: str = "", *,
-          tool: str = "", query: str = "", how: str = "", final: bool = False) -> dict:
+          tool: str = "", query: str = "", how: str = "",
+          tech: dict | None = None, final: bool = False) -> dict:
     return {"icon": icon, "title": title, "tool": tool, "query": query, "how": how,
-            "lines": lines, "note": note, "final": final}
+            "lines": lines, "note": note, "tech": tech or {}, "final": final}
+
+
+def agent_info() -> dict:
+    """Run-level facts for the reviewer: the agent framework and the model."""
+    model = os.getenv("OPENROUTER_MODEL", "openai/gpt-4o-mini")
+    return {
+        "framework": "LangGraph ReAct agent (create_react_agent)",
+        "model": f"{model} via OpenRouter",
+        "note": "The model picks which tool(s) to call by function-calling.",
+    }
 
 
 def summarize_run(messages: list, reply: str) -> list[dict]:
-    """Build the ordered, plain-English steps for one agent run.
+    """Build the ordered steps for one agent run.
 
     `messages` is the full LangGraph message list; `reply` is the final answer.
     Returns one step per source the agent checked, then a closing answer step.
@@ -79,8 +96,15 @@ def summarize_run(messages: list, reply: str) -> list[dict]:
 
 def _store_step(term: str, content: str) -> dict:
     title = f"Looked up the official rulings on “{term}”"
-    how = "Database lookup in the additive rulings table (DuckDB)"
-    kw = {"tool": "additive_status", "query": term, "how": how}
+    kw = {
+        "tool": "additive_status", "query": term,
+        "how": "Database lookup in the additive rulings table",
+        "tech": {
+            "technique": "Deterministic SQL lookup (no LLM)",
+            "call": ("resolve_additive(term) → SELECT jurisdiction, status, detail, "
+                     "citation, as_of FROM regulatory_status WHERE cas = ?  (DuckDB)"),
+        },
+    }
     low = content.lower()
     if "no additive found" in low:
         return _step("⚖️", title, ["We don’t have this additive in our data yet."],
@@ -110,9 +134,16 @@ def _store_step(term: str, content: str) -> dict:
 
 def _rag_step(term: str, content: str) -> dict:
     title = f"Read the evidence notes about “{term}”"
-    how = ("AI semantic search (RAG): turned the query into a vector and matched "
-           "the closest brief passages in the vector index (Chroma + bge-small)")
-    kw = {"tool": "search_briefs", "query": term, "how": how}
+    kw = {
+        "tool": "search_briefs", "query": term,
+        "how": "AI semantic search (RAG) over the evidence notes",
+        "tech": {
+            "technique": "Dense vector retrieval (RAG)",
+            "call": (f'Chroma.similarity_search_with_score("{term}", k=4) over '
+                     f'collection "briefs"; embeddings {_EMBED_MODEL} '
+                     "(fastembed/ONNX); cosine distance"),
+        },
+    }
     if "no brief passages" in content.lower():
         return _step("📚", title, ["No evidence notes matched this."],
                      "When there’s nothing to cite, the app says so instead of guessing.", **kw)
@@ -125,8 +156,16 @@ def _rag_step(term: str, content: str) -> dict:
 
 def _recalls_step(term: str, content: str) -> dict:
     title = f"Checked for active recalls of “{term}”"
-    how = "Live web API call to openFDA (api.fda.gov)"
-    kw = {"tool": "check_recalls", "query": term, "how": how}
+    kw = {
+        "tool": "check_recalls", "query": term,
+        "how": "Live web API call to the FDA",
+        "tech": {
+            "technique": "Live REST API call (openFDA food-enforcement)",
+            "call": (f'GET api.fda.gov/food/enforcement.json?search='
+                     f'reason_for_recall:"{term}"&limit=5  '
+                     "(falls back to product_description)"),
+        },
+    }
     low = content.lower()
     if "could not reach" in low:
         return _step("🚨", title, ["Couldn’t reach the FDA recall service just now."], **kw)
@@ -139,8 +178,16 @@ def _recalls_step(term: str, content: str) -> dict:
 
 def _actions_step(term: str, content: str) -> dict:
     title = f"Checked for recent government action on “{term}”"
-    how = "Live web API call to the US Federal Register (federalregister.gov)"
-    kw = {"tool": "recent_regulatory_actions", "query": term, "how": how}
+    kw = {
+        "tool": "recent_regulatory_actions", "query": term,
+        "how": "Live web API call to the US Federal Register",
+        "tech": {
+            "technique": "Live REST API call (US Federal Register)",
+            "call": (f"GET federalregister.gov/api/v1/documents.json?"
+                     f"conditions[term]={term}&conditions[agencies][]="
+                     "food-and-drug-administration&order=relevance&per_page=5"),
+        },
+    }
     low = content.lower()
     if "could not reach" in low:
         return _step("📰", title, ["Couldn’t reach the government service just now."], **kw)
@@ -165,7 +212,12 @@ def _answer_step(reply: str, *, tool_calls: bool) -> dict:
         "not proven harmful", "isn’t the same", "isn't the same",
     )):
         lines.append("It keeps “banned somewhere” separate from “proven harmful”.")
+    model = os.getenv("OPENROUTER_MODEL", "openai/gpt-4o-mini")
     how = ("The AI wrote the answer from the results above"
            if tool_calls else
            "The AI answered directly, without calling any tool")
-    return _step("✅", "Wrote the answer", lines, how=how, final=True)
+    tech = {
+        "technique": "LLM synthesis over the tool results (ReAct agent)",
+        "call": f"create_react_agent (LangGraph); model {model} via OpenRouter",
+    }
+    return _step("✅", "Wrote the answer", lines, how=how, tech=tech, final=True)
