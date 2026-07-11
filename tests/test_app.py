@@ -29,7 +29,9 @@ def test_app_renders_title_and_examples():
 
 
 def test_saving_profile_persists_to_memory():
-    at = AppTest.from_file(APP).run(timeout=30)
+    at = AppTest.from_file(APP)
+    at.session_state["view"] = "👤 Profile"  # the profile form lives in the Profile tab
+    at.run(timeout=30)
     # Fill the profile form and submit (form-submit buttons live in at.button).
     at.text_input[0].set_value("vegetarian")
     at.text_input[1].set_value("peanuts")
@@ -109,6 +111,15 @@ def test_pantry_add_and_remove_a_product():
 
     at.button(key=f"browse_rm_{SKITTLES}").click().run(timeout=60)
     assert SKITTLES not in {r["barcode"] for r in memory.get_log(con, uid)}
+
+
+def test_clicking_a_product_name_opens_details_without_error():
+    SKITTLES = "0072392328307"
+    at = AppTest.from_file(APP)
+    at.session_state["view"] = "🧺 Pantry"
+    at.run(timeout=60)
+    at.button(key=f"browse_info_{SKITTLES}").click().run(timeout=60)
+    assert not at.exception
 
 
 def _chips(at):
