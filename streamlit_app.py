@@ -44,12 +44,15 @@ from label_lens.rag.index import ensure_index  # noqa: E402
 
 st.set_page_config(page_title="Label Lens", page_icon="🔎", layout="centered")
 
-# Keep the chrome minimal: hide the ⋮ menu (Rerun / Print / Record / Clear cache)
-# and the Deploy button, and give the "Remove from pantry" buttons a red shade
+# Bigger base text, a header underline, and red "Remove from Pantry" buttons
 # (their widget keys contain "_rm_", which Streamlit exposes as an st-key- class).
+# The developer chrome (Clear cache etc.) is handled by toolbarMode in
+# .streamlit/config.toml, not here.
 st.markdown("""
 <style>
-#MainMenu, [data-testid="stMainMenu"], [data-testid="stAppDeployButton"] { display: none !important; }
+html { font-size: 18px; }
+[data-testid="stCaptionContainer"] p { font-size: 0.92rem; }
+.stMarkdown p, [data-testid="stChatMessageContent"] p { font-size: 1.03rem; line-height: 1.55; }
 div[class*="_rm_"] button { background-color:#e05656 !important; border-color:#e05656 !important; color:#fff !important; }
 div[class*="_rm_"] button:hover { background-color:#c94444 !important; border-color:#c94444 !important; }
 </style>
@@ -146,6 +149,7 @@ def _password_ok() -> bool:
     if st.session_state.get("auth_ok"):
         return True
 
+    st.markdown("## 🔎 Label Lens")
     st.caption("This demo is password-protected. Enter the password from the submission.")
     with st.form("login"):
         pw = st.text_input("Password", type="password")
@@ -191,21 +195,31 @@ def sidebar_summary() -> None:
 
 
 def main() -> None:
-    st.title("🔎 Label Lens")
     if not _password_ok():
         return
     _warm()
     sidebar_summary()
-
-    view = st.segmented_control(
-        "view", ["💬 Chat", "🧺 Pantry", "👤 Profile"], default="💬 Chat",
-        key="view", label_visibility="collapsed")
+    view = _header()
     if view == "🧺 Pantry":
         render_pantry()
     elif view == "👤 Profile":
         render_profile()
     else:
         render_chat()
+
+
+def _header() -> str:
+    """A header row: name+icon on the left, the tabs in the middle. The Share
+    button and menu are Streamlit's own, pinned top-right by the toolbar."""
+    left, mid, _right = st.columns([3, 4, 1], vertical_alignment="center")
+    with left:
+        st.markdown("## 🔎 Label Lens")
+    with mid:
+        view = st.segmented_control(
+            "view", ["💬 Chat", "🧺 Pantry", "👤 Profile"], default="💬 Chat",
+            key="view", label_visibility="collapsed")
+    st.divider()
+    return view or "💬 Chat"
 
 
 def render_profile() -> None:
