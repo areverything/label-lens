@@ -59,25 +59,54 @@ div[class*="_rm_"] button:hover { background-color:#c94444 !important; border-co
 
 /* Real fixed header bar across the top of the screen.
    Streamlit stacks the sidebar (z 999991) and its own header (z 999990) above
-   normal content, both with opaque backgrounds, so a plain fixed bar gets
-   painted over. Fix: lift our bar above the sidebar (999992); keep Streamlit's
-   header above ours (999993) but make it transparent and click-through so its
-   Share/menu buttons still show and work while its background no longer hides
-   our bar and its body no longer blocks clicks on our tabs. */
+   normal content with opaque backgrounds, so a plain fixed bar gets painted
+   over. Lift our bar above the sidebar (999992). Keep Streamlit's header above
+   ours (999993) but make it transparent so its background stops hiding our bar.
+   The bar height matches the native header (3.75rem) with no vertical padding,
+   so the logo, tabs and Share buttons all sit on the same centre line. */
 .st-key-ll_header {
   position: fixed; top: 0; left: 0; right: 0; z-index: 999992;
-  background: var(--background-color, #0e1117);
-  border-bottom: 1px solid rgba(128,128,128,0.28);
-  min-height: 3.75rem; padding: 0.25rem 1.25rem;
+  background: #0e1117; border-bottom: 1px solid rgba(128,128,128,0.28);
+  height: 3.75rem; padding: 0 1.25rem;
   display: flex; align-items: center;
 }
-.st-key-ll_header > div { width: 100%; }
-.st-key-ll_header [data-testid="stHorizontalBlock"] { align-items: center; }
-[data-testid="stHeader"] { background: transparent !important; z-index: 999993 !important; pointer-events: none; }
-[data-testid="stToolbar"] { pointer-events: auto; }
-/* Push the page and the sidebar content down below the fixed header. */
+/* Full-height flex-centering down the whole nesting so the logo, tabs and the
+   Share buttons all land on the same vertical centre line. */
+.st-key-ll_header > div,
+.st-key-ll_header [data-testid="stHorizontalBlock"],
+.st-key-ll_header [data-testid="stColumn"],
+.st-key-ll_header [data-testid="stElementContainer"],
+.st-key-ll_header [data-testid="stButtonGroup"],
+.st-key-ll_header [data-testid="stMarkdown"],
+.st-key-ll_header [data-testid="stMarkdown"] > div,
+.st-key-ll_header [data-testid="stMarkdownContainer"] {
+  height: 100%; display: flex; align-items: center; width: 100%;
+}
+.st-key-ll_header .stMarkdown p { margin: 0; line-height: 1; }
+
+/* Tabs = plain clickable text: strip the segmented-control button borders/pills
+   and show selection by colour only (bright+bold = selected, muted = not). */
+.st-key-ll_header [data-testid="stButtonGroup"] button {
+  border: none !important; background: transparent !important; box-shadow: none !important;
+  padding: 0.25rem 0.7rem !important;
+}
+.st-key-ll_header button[aria-checked="false"] { color: #9aa0aa !important; }
+.st-key-ll_header button[aria-checked="false"]:hover { color: #d7dae0 !important; }
+.st-key-ll_header button[aria-checked="true"] { color: #ffffff !important; font-weight: 700 !important; }
+
+/* Streamlit's toolbar spans the whole header width and is transparent but
+   click-catching, which swallowed clicks meant for the tabs. Let clicks pass
+   through the header/toolbar and re-enable only the real toolbar controls. */
+[data-testid="stHeader"] { background: transparent !important; z-index: 999993 !important; }
+[data-testid="stHeader"], [data-testid="stToolbar"] { pointer-events: none; }
+[data-testid="stToolbar"] button, [data-testid="stToolbar"] a,
+[data-testid="stToolbar"] summary, [data-testid="stToolbar"] [role="button"] { pointer-events: auto; }
+
+/* Push the page down, and push the whole sidebar below the bar so its collapse
+   arrow (which lives at the very top of the sidebar) clears the bar and stays
+   clickable. */
 [data-testid="stMainBlockContainer"], .block-container { padding-top: 5rem !important; }
-[data-testid="stSidebarUserContent"] { padding-top: 3.25rem; }
+[data-testid="stSidebar"] { margin-top: 3.75rem; }
 </style>
 """, unsafe_allow_html=True)
 
