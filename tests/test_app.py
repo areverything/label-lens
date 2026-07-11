@@ -16,9 +16,10 @@ CANNED = "E171 is banned in the EU [Reg (EU) 2022/63]."
 
 @pytest.fixture(autouse=True)
 def _stub_answer(monkeypatch):
-    # streamlit_app does `from ...graph import answer`; AppTest re-runs that import
-    # each run, so patching the source binds the stub into the app namespace.
-    monkeypatch.setattr(graph, "answer", lambda q, **kw: CANNED)
+    # streamlit_app does `from ...graph import answer_with_trace`; AppTest re-runs
+    # that import each run, so patching the source binds the stub into the app
+    # namespace. The stub returns (reply, empty-trace) to match the real signature.
+    monkeypatch.setattr(graph, "answer_with_trace", lambda q, **kw: (CANNED, []))
 
 
 def test_app_renders_title_and_examples():

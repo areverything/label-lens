@@ -16,6 +16,7 @@ from langgraph.prebuilt import create_react_agent
 
 from label_lens.agent import memory
 from label_lens.agent.tools import ALL_TOOLS, _con
+from label_lens.agent.trace import summarize_run
 from label_lens.config import ROOT
 
 load_dotenv(ROOT / ".env.local")
@@ -83,10 +84,23 @@ def _memory_block(user_id: str) -> str:
     return "\n".join(parts)
 
 
-def answer(question: str, *, user_id: str = "demo") -> str:
-    """Answer one question for a user, reading their memory first."""
+def answer_with_trace(question: str, *, user_id: str = "demo") -> tuple[str, list[dict]]:
+    """Answer one question and return (reply, activity trace).
+
+    The trace is the ordered list of steps the agent actually took (which lane,
+    the query, a one-line result, and the requirement each step demonstrates),
+    for the UI to show as a background activity log.
+    """
     agent = create_react_agent(
         _model(), ALL_TOOLS, prompt=SYSTEM_RULES + _memory_block(user_id),
     )
     result = agent.invoke({"messages": [{"role": "user", "content": question}]})
-    return result["messages"][-1].content
+    messages = result["messages"]
+    reply = messages[-1].content
+    return reply, summarize_run(messages, reply)
+
+
+def answer(question: str, *, user_id: str = "demo") -> str:
+    """Answer one question for a user, reading their memory first."""
+    reply, _ = answer_with_trace(question, user_id=user_id)
+    return reply
