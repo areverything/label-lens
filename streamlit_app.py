@@ -14,6 +14,7 @@ import hmac
 import html
 import os
 import sys
+import time
 import uuid
 from pathlib import Path
 
@@ -37,7 +38,7 @@ except Exception:
     pass
 
 from label_lens.agent import memory  # noqa: E402
-from label_lens.agent.graph import answer  # noqa: E402
+from label_lens.agent.graph import answer_with_trace  # noqa: E402
 from label_lens.agent.tools import _con  # noqa: E402
 from label_lens.config import DATA  # noqa: E402
 from label_lens.rag.index import ensure_index  # noqa: E402
@@ -270,6 +271,7 @@ def main() -> None:
         render_profile()
     else:
         render_chat()
+    _footer_log()
 
 
 def _header() -> str:
@@ -323,18 +325,24 @@ def render_chat() -> None:
     prompt = st.session_state.pop("pending", None) or typed
 
     for m in st.session_state.messages:
-        st.chat_message(m["role"]).markdown(m["content"])
+        with st.chat_message(m["role"]):
+            st.markdown(m["content"])
+            if m["role"] == "assistant":
+                _trace_expander(m.get("trace"))
 
     if prompt:
         st.session_state.messages.append({"role": "user", "content": prompt})
         st.chat_message("user").markdown(prompt)
         with st.chat_message("assistant"), st.spinner("Checking the regulators..."):
             try:
-                reply = answer(prompt, user_id=_user_id())
+                reply, trace = answer_with_trace(prompt, user_id=_user_id())
             except Exception as e:
-                reply = f"Something went wrong: {e}"
+                reply, trace = f"Something went wrong: {e}", []
             st.markdown(reply)
-        st.session_state.messages.append({"role": "assistant", "content": reply})
+            _trace_expander(trace)
+        st.session_state.messages.append(
+            {"role": "assistant", "content": reply, "trace": trace})
+        _record_activity(prompt, trace)
 
     _suggestion_chips()
 
@@ -433,6 +441,90 @@ def _product_grid(items: list[dict], in_pantry: set[str], *, key_prefix: str,
                            type="primary", use_container_width=True):
                 memory.log_product(con, uid, barcode=bc, name=p["name"])
                 st.rerun()
+
+
+# --- Background activity log ------------------------------------------------
+# The agent routes each question to a lane (Store / RAG / live government API).
+# We surface the real steps it took in two places: a "What happened" expander
+# under each answer, and a session-wide console at the foot of the app. Both
+# read the same trace produced by the agent, so they show what actually ran.
+
+_LANE_COLOR = {
+    "Store": "#4c8bf5",
+    "RAG": "#22a06b",
+    "Answer": "#9aa0aa",
+}
+
+
+def _lane_badge(lane: str) -> str:
+    """A small coloured lane pill. Live lanes share the amber colour."""
+    color = _LANE_COLOR.get(lane, "#e0913a" if lane.startswith("Live") else "#9aa0aa")
+    return (f'<span style="background:{color}22;color:{color};border:1px solid '
+            f'{color}66;border-radius:6px;padding:1px 7px;font-size:0.72rem;'
+            f'font-weight:600;white-space:nowrap">{html.escape(lane)}</span>')
+
+
+def _step_html(step: dict) -> str:
+    """One trace step as a compact HTML line: lane badge, call, result, tags."""
+    tags = " · ".join(step.get("tags") or [])
+    tag_html = (f'<span style="color:#8a8f98"> ⟶ <em>{html.escape(tags)}</em></span>'
+                if tags else "")
+    call = step.get("call") or "answer composed"
+    result = step.get("result") or ""
+    arrow = "✓" if step.get("kind") == "answer" else "→"
+    return (
+        '<div style="margin:3px 0;font-size:0.82rem;line-height:1.4">'
+        f'{_lane_badge(step.get("lane", ""))} '
+        f'<code style="font-size:0.78rem">{html.escape(call)}</code>'
+        f'{tag_html}<br>'
+        f'<span style="color:#9aa0aa;padding-left:1.1rem">{arrow} '
+        f'{html.escape(result)}</span></div>'
+    )
+
+
+def _trace_expander(trace: list[dict] | None) -> None:
+    """Collapsible "What happened" panel under a single assistant reply."""
+    if not trace:
+        return
+    n = sum(1 for s in trace if s.get("kind") == "tool")
+    label = f"🔍 What happened · {n} background step{'s' if n != 1 else ''}"
+    with st.expander(label, expanded=False):
+        st.markdown("".join(_step_html(s) for s in trace), unsafe_allow_html=True)
+
+
+def _record_activity(question: str, trace: list[dict]) -> None:
+    """Append this question's run to the session-wide activity console."""
+    st.session_state.setdefault("activity_log", []).append(
+        {"time": time.strftime("%H:%M:%S"), "question": question, "trace": trace})
+
+
+def _footer_log() -> None:
+    """The app-wide activity console, pinned at the foot of every tab.
+
+    Shows, newest first, what the agent did in the background for each question:
+    the lane it routed to, the query, the result, and the requirement each step
+    demonstrates. It's the same trace the per-answer panel shows, accumulated.
+    """
+    log = st.session_state.get("activity_log", [])
+    st.divider()
+    title = f"⚙️ Background activity log · {len(log)} question{'s' if len(log) != 1 else ''} this session"
+    with st.expander(title, expanded=False):
+        st.caption(
+            "A live trace of the agent working: which lane each question was "
+            "routed to (Store lookup, RAG evidence, or a live government API), "
+            "the query it ran, what came back, and the requirement each step meets."
+        )
+        if not log:
+            st.caption("No questions yet. Ask something in the **Chat** tab.")
+            return
+        for entry in reversed(log):
+            st.markdown(
+                f'<div style="margin-top:0.6rem;font-size:0.86rem">'
+                f'<span style="color:#8a8f98">{entry["time"]}</span> · '
+                f'<strong>{html.escape(entry["question"])}</strong></div>',
+                unsafe_allow_html=True)
+            st.markdown("".join(_step_html(s) for s in entry["trace"]),
+                        unsafe_allow_html=True)
 
 
 def _suggestion_chips() -> None:
