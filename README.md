@@ -12,30 +12,38 @@ Why it's hard: each regulator names additives differently (Europe uses an **E-nu
 
 ## Quick Start
 
+The additive database and the vector index are already built and committed, so **you don't need to run any build scripts to use the app**. Two steps: install, then run.
+
 ```bash
 cd ~/code/courses/label_lens
-uv sync                                   # install dependencies (Python 3.13 via uv)
-uv run python scripts/build_spine.py      # build the additive database -> data/label_lens.duckdb
-uv run python scripts/load_products.py    # load US candy products from Open Food Facts
-uv run python scripts/build_briefs.py     # generate the per-additive briefs (needs the LLM key)
-uv run python scripts/build_index.py      # embed the briefs into the Chroma vector index
+uv sync                                          # install dependencies (Python 3.13 via uv)
+uv run streamlit run streamlit_app.py            # opens http://localhost:8501
 ```
 
-Then ask the agent a question (needs `OPENROUTER_API_KEY` in `.env.local`):
+The chat app needs one key to answer questions: put `OPENROUTER_API_KEY=...` in a `.env.local` file at the repo root before running. (Optional: `OPENROUTER_MODEL` to pick the model, `LANGSMITH_API_KEY` to trace each run.)
+
+Prefer the command line? Ask the agent one question directly:
 
 ```bash
 uv run python scripts/ask.py "Why did the EU ban titanium dioxide, and does that mean it's dangerous?"
 ```
 
-Or open the chat app in a browser (phone or laptop):
+The agent routes each question to the right lane: a **Store** lookup (DuckDB) for legal facts, **RAG** over the briefs for evidence, or a **live** government API (openFDA recalls, Federal Register bans). It cites every claim and refuses medical verdicts.
+
+### Rebuilding the database from scratch (optional, not needed to run)
+
+The four build scripts below regenerate `data/label_lens.duckdb` and the Chroma index. They already ran once and their output is committed, so run these **only** if you want to rebuild.
 
 ```bash
-uv run streamlit run streamlit_app.py            # opens http://localhost:8501
+uv run python scripts/build_spine.py      # build the additive database -> data/label_lens.duckdb
+uv run python scripts/load_products.py    # load US candy products from Open Food Facts
+uv run python scripts/build_briefs.py     # generate the per-additive briefs (needs OPENROUTER_API_KEY)
+uv run python scripts/build_index.py      # embed the briefs into the Chroma vector index
 ```
 
-The agent routes each question to the right lane: a **Store** lookup (DuckDB) for legal facts, **RAG** over the briefs for evidence, or a **live** government API (openFDA recalls, Federal Register bans). It cites every claim and refuses medical verdicts. Set a LangSmith key (`LANGSMITH_API_KEY`) to see each run traced.
+No API keys are needed for `build_spine` or `build_index`; `build_briefs` needs `OPENROUTER_API_KEY`. Heads-up: `load_products.py` calls the public Open Food Facts API, which is now behind bot protection and may return **401/503**. That failure only affects rebuilding the product table, not running the app against the committed database.
 
-This builds a table of additives (each linked to its CAS number) plus their legal status per region, and prints a coverage report. Query it:
+Once built (or using the committed database), query it directly:
 
 ```bash
 uv run python - <<'PY'
@@ -47,8 +55,6 @@ for row in con.execute(
     print(row)   # E171: banned in the EU, permitted by the US FDA, not a dietary cancer classification
 PY
 ```
-
-No API keys are needed to build the database. An LLM key (for the question-answering features) goes in `.env.local`.
 
 ## Documentation
 
