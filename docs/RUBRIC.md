@@ -59,19 +59,19 @@ Every scored deliverable, its points, where it's answered in [SUBMISSION.md](./S
 | 2 | 7 | Agent-workflow diagram + 1-2 paragraphs | [§2.3](./SUBMISSION.md#23-agent-workflow) | 🔨 |
 | 3 | 5 | All data sources + external APIs + their use | [§3.2](./SUBMISSION.md#32-data-sources-and-external-apis) | ✅ |
 | 3 | 5 | Default chunking strategy + why | [§3.1](./SUBMISSION.md#31-chunking-strategy) | ✅ |
-| 4 | 15 | End-to-end prototype + deploy with a front end | [§4](./SUBMISSION.md#task-4-end-to-end-agentic-rag-prototype) | 🔨 |
+| 4 | 15 | End-to-end prototype + deploy with a front end | [§4](./SUBMISSION.md#task-4-end-to-end-agentic-rag-prototype) | ✅ |
 | 5 | 2 | Test dataset | [§5.1](./SUBMISSION.md#51-test-dataset) | ✅ |
 | 5 | 10 | Evaluation harness | [§5.2](./SUBMISSION.md#52-evaluation-harness) | ✅ |
 | 5 | 3 | Conclusions on performance | [§5.3](./SUBMISSION.md#53-conclusions) | ✅ |
 | 6 | 6 | Advanced retriever + why | [§6.1](./SUBMISSION.md#61-advanced-retriever-cross-encoder-reranker) | ✅ |
 | 6 | 2 | Before/after comparison table | [§6.2](./SUBMISSION.md#62-beforeafter-results) | ✅ |
 | 6 | 6 | One other improvement + eval evidence | [§6.3](./SUBMISSION.md#63-second-improvement-hybrid-bm25--dense) | ✅ |
-| 7 | 2 | Keep/change reflection for Demo Day | [§7](./SUBMISSION.md#task-7-next-steps) | ☐ |
+| 7 | 2 | Keep/change reflection for Demo Day | [§7](./SUBMISSION.md#task-7-next-steps) | ✅ |
 | Final | 10 | 10-min-or-less Loom video (live demo + use case) | [SUBMISSION.md top](./SUBMISSION.md) | ☐ |
-| Final | 10 | Written document answering every deliverable | [SUBMISSION.md](./SUBMISSION.md) | 🔨 |
-| Final | 0 | All relevant code | the repository | 🔨 |
+| Final | 10 | Written document answering every deliverable | [SUBMISSION.md](./SUBMISSION.md) | ✅ |
+| Final | 0 | All relevant code | the repository (public) | ✅ |
 
-> Status so far: the CAS store, the 28-brief RAG corpus, the Chroma index, the **working LangGraph agent** (four tools + memory, through OpenRouter), the **Streamlit chat UI**, and the **evaluation harness** (gold set + LLM-judge + RAGAS + retrieval before/after tables) are **built**. Tasks 1-3, 5, 6 are answered in SUBMISSION.md with recorded numbers. Task 4's front end is done; only the one-time public deploy (a Community Cloud login) remains. Task 7 (next-steps reflection) and the final video/repo items remain.
+> Status so far: everything except the demo video is done. The CAS store, the 28-brief RAG corpus, the Chroma index, the **working LangGraph agent** (four tools + memory, through OpenRouter), the **Streamlit chat UI** (live and public at https://label-lens.streamlit.app/), and the **evaluation harness** (gold set + LLM-judge + RAGAS + retrieval before/after tables) are built. Tasks 1-7 are answered in SUBMISSION.md with recorded numbers. **Only remaining: the ≤10-minute Loom demo video** (and pasting its link at the top of SUBMISSION.md).
 
 ## Cross-cutting requirements
 
@@ -82,7 +82,7 @@ Not separate rubric lines, but required across the build (mostly folded into Tas
 - **External API / agentic search**: done (openFDA recalls + Federal Register bans, `agent/live.py`).
 - **Memory component**: done (user diet/allergy profile + product log, `agent/memory.py`).
 - **Runs in a phone and laptop browser**: done (Streamlit chat UI, `streamlit_app.py`; responsive by default).
-- **Front end + public deployment**: front end done; public deploy packaged and pending a one-time Community Cloud login (runbook in SUBMISSION §4.2). Explicitly required by Task 4.
+- **Front end + public deployment**: done, live at https://label-lens.streamlit.app/ (password-gated to protect the LLM key; opens on phone and laptop). Explicitly required by Task 4.
 
 ## Where the points are (prioritise these)
 
