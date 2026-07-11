@@ -464,42 +464,36 @@ def _agent_header() -> str:
     )
 
 
-def _tool_html(step: dict) -> str:
-    """The plain "how it was retrieved" line: the tool called and the method."""
-    how = step.get("how") or ""
-    tool, query = step.get("tool"), step.get("query")
-    if tool:
-        call = f'{tool}("{query}")' if query else tool
-        mech = (f'<code style="font-size:0.78rem;color:#c9a86a">{html.escape(call)}'
-                f'</code> · {html.escape(how)}')
-    elif how:
-        mech = html.escape(how)
-    else:
-        return ""
-    return (f'<div style="color:#8a8f98;font-size:0.79rem;line-height:1.4;'
-            f'padding-left:1.9rem;margin-top:2px">🔧 {mech}</div>')
-
-
 def _tech_html(step: dict) -> str:
-    """The reviewer detail: the technique used and the precise call made."""
+    """One consolidated reviewer block per step: the tool called, the technique,
+    and the exact call, all together. The agent framework/model live once in the
+    banner, so they are not repeated here."""
     t = step.get("tech") or {}
-    if not t.get("technique") and not t.get("call"):
+    technique, call = t.get("technique", ""), t.get("call", "")
+    tool, query = step.get("tool"), step.get("query")
+    if not technique and not call and not tool:
         return ""
-    rows = ""
-    if t.get("technique"):
-        rows += f'<div>⚙️ <strong>Technique:</strong> {html.escape(t["technique"])}</div>'
-    if t.get("call"):
+    head = ""
+    if tool:
+        label = f'{tool}("{query}")' if query else tool
+        head = f'<code style="font-size:0.78rem;color:#c9a86a">{html.escape(label)}</code>'
+        if technique:
+            head += f' · {html.escape(technique)}'
+    elif technique:
+        head = html.escape(technique)
+    rows = f'<div>🔧 {head}</div>'
+    if call:
         rows += (f'<div style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;'
-                 f'color:#9aa2ad;word-break:break-word;margin-top:1px">↳ '
-                 f'{html.escape(t["call"])}</div>')
-    return (f'<div style="padding-left:1.9rem;margin-top:4px;font-size:0.76rem;'
-            f'color:#7f8792;line-height:1.45;border-left:2px solid #33373e;'
-            f'padding-top:1px;padding-bottom:1px;margin-left:0.2rem">{rows}</div>')
+                 f'color:#9aa2ad;word-break:break-word;padding-left:1.25rem;'
+                 f'margin-top:1px">↳ {html.escape(call)}</div>')
+    return (f'<div style="padding-left:1.9rem;margin-top:5px;font-size:0.77rem;'
+            f'color:#8a8f98;line-height:1.45;border-left:2px solid #33373e;'
+            f'margin-left:0.2rem;padding:2px 0 2px 0.5rem">{rows}</div>')
 
 
 def _steps_html(trace: list[dict]) -> str:
-    """Render the ordered steps: numbered actions, plain method (🔧), plain
-    results, a why-it-matters note, and the reviewer technical detail."""
+    """Render the ordered steps: numbered plain actions, plain results, a
+    why-it-matters note, then one consolidated technical block for reviewers."""
     parts, n = [], 0
     for s in trace:
         if s.get("final"):
@@ -520,7 +514,7 @@ def _steps_html(trace: list[dict]) -> str:
             f'<div style="margin:0.7rem 0">'
             f'<div style="font-weight:600;font-size:0.94rem">{marker} '
             f'{html.escape(s["title"])}</div>'
-            f'{_tool_html(s)}{body}{note}{_tech_html(s)}</div>')
+            f'{body}{note}{_tech_html(s)}</div>')
     return "".join(parts)
 
 
@@ -532,9 +526,9 @@ def _trace_expander(trace: list[dict] | None) -> None:
     label = f"🔍 How it found this answer · {n} step{'s' if n != 1 else ''}"
     with st.expander(label, expanded=False):
         st.caption("Label Lens answers by checking official sources one step at a "
-                   "time. Each step shows what it did (in plain terms), the 🔧 tool "
-                   "it used, what it found, and (for reviewers) the ⚙️ technique and "
-                   "exact call.")
+                   "time. Each step shows what it did (in plain terms), what it "
+                   "found, and a 🔧 technical line for reviewers (the tool, the "
+                   "technique, and the exact call).")
         st.markdown(_agent_header(), unsafe_allow_html=True)
         st.markdown(_steps_html(trace), unsafe_allow_html=True)
 
@@ -557,8 +551,8 @@ def _footer_log() -> None:
     title = f"📋 Activity log · {len(log)} question{'s' if len(log) != 1 else ''} this session"
     with st.expander(title, expanded=False):
         st.caption("A record of what the app did behind the scenes for each "
-                   "question: plain-language steps for everyone, plus the ⚙️ "
-                   "technique and exact call for reviewers.")
+                   "question: plain-language steps for everyone, plus a 🔧 "
+                   "technical line (tool, technique, exact call) for reviewers.")
         if not log:
             st.caption("Nothing yet. Ask a question in the **Chat** tab and it'll "
                        "show up here.")

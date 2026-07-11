@@ -51,7 +51,7 @@ def test_store_step_is_plain_and_flags_divergence():
     # composed it (a tool ran upstream).
     assert steps[-1]["final"] is True
     assert any("cited" in line for line in steps[-1]["lines"])
-    assert "wrote the answer from the results" in steps[-1]["how"].lower()
+    assert "composed the answer from the tool results" in steps[-1]["tech"]["technique"].lower()
 
 
 def test_each_lane_reports_its_tool_and_retrieval_method():
@@ -128,9 +128,9 @@ def test_rag_step_counts_passages_without_jargon():
     rag = summarize_run(msgs, msgs[-1].content)[0]
     assert "2 most relevant passages" in _text(rag)
     # The plain result/headline stays jargon-free; "RAG" only appears in the
-    # separate mechanism line.
+    # separate technical block.
     assert "RAG" not in rag["title"] and not any("RAG" in ln for ln in rag["lines"])
-    assert "RAG" in rag["how"]
+    assert "RAG" in rag["tech"]["technique"]
 
 
 def test_safety_refusal_line_is_present():
