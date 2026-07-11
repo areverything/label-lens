@@ -10,6 +10,7 @@ Entry point for Streamlit Community Cloud (auto-detected at the repo root).
 """
 from __future__ import annotations
 
+import hmac
 import os
 import sys
 import uuid
@@ -72,6 +73,34 @@ def _user_id() -> str:
     return st.session_state.user_id
 
 
+def _password_ok() -> bool:
+    """Shared-password gate so a public visitor can't spend the OpenRouter key.
+
+    The expected password comes from st.secrets["APP_PASSWORD"]. If none is set
+    (e.g. local dev), the app is open. Nothing downstream runs until this returns
+    True, so no model call happens for an unauthenticated visitor.
+    """
+    try:
+        expected = st.secrets.get("APP_PASSWORD")
+    except Exception:
+        expected = None
+    if not expected:
+        return True
+    if st.session_state.get("auth_ok"):
+        return True
+
+    st.caption("This demo is password-protected. Enter the password from the submission.")
+    with st.form("login"):
+        pw = st.text_input("Password", type="password")
+        if st.form_submit_button("Enter"):
+            if hmac.compare_digest(pw, str(expected)):
+                st.session_state.auth_ok = True
+                st.rerun()
+            else:
+                st.error("Incorrect password.")
+    return False
+
+
 def sidebar() -> None:
     uid = _user_id()
     con = _con()
@@ -106,13 +135,15 @@ def sidebar() -> None:
 
 
 def main() -> None:
-    _warm()
     st.title("🔎 Label Lens")
     st.caption(
         "Ask about a food additive or a product. Answers are cited from regulators "
         "(EU, US FDA, California, IARC), separate legal status from hazard from harm, "
         "and never give medical advice."
     )
+    if not _password_ok():
+        return
+    _warm()
     sidebar()
 
     if "messages" not in st.session_state:

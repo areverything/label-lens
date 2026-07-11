@@ -2,7 +2,7 @@
 
 This document is the write-up: it answers **every deliverable and question** in the Certification Challenge, one section per task. Coverage, points, and per-deliverable status are tracked in [`RUBRIC.md`](./RUBRIC.md#coverage-checklist); design rationale is in [`TECH_DESIGN.md`](./TECH_DESIGN.md).
 
-- **Live demo (public endpoint):** _TODO: URL_
+- **Live demo (public endpoint):** https://label-lens.streamlit.app/ (password-protected to prevent abuse of the LLM key; the password is provided with the submission, and the app opens on phone and laptop).
 - **Demo video (≤10 min):** _TODO: Loom link_
 - **Code:** this repository.
 
@@ -180,13 +180,15 @@ Before routing, it reads the user's memory (diet/allergy profile + logged produc
 
 Deployed to **Streamlit Community Cloud** from this repo. Entry point: [`streamlit_app.py`](../streamlit_app.py) at the repo root (auto-detected). Runs in a phone or laptop browser.
 
-- **Public URL:** _TODO: paste the share.streamlit.io URL after the first deploy._
+- **Public URL:** https://label-lens.streamlit.app/
+
+The app is behind a shared-password gate (`APP_PASSWORD` in the host secrets, checked with a constant-time compare in `streamlit_app.py`). This is deliberate: the app calls a paid LLM gateway on the owner's key, so an open endpoint would let anyone spend credits. The URL is public and opens on any device; the password (supplied with the submission) unlocks it, and nothing calls the model until it is entered. Defence-in-depth: the OpenRouter key also carries a hard credit cap.
 
 How it is packaged for the free tier:
 
 - **Data:** the built DuckDB store (`data/label_lens.duckdb`, ~2.3 MB) is committed, so the app has the additive/status/product data on clone without an expensive rebuild. The Chroma index is rebuilt once on first boot from the committed briefs (cached, no LLM cost).
 - **Dependencies:** `requirements.txt` (generated from the uv lock). The embedding model runs through fastembed/ONNX, so there is no torch/CUDA install to blow the memory limit.
-- **Secret:** set `OPENROUTER_API_KEY` in the app's *Settings → Secrets*; the app bridges it into the environment the agent reads.
+- **Secrets:** set `OPENROUTER_API_KEY` (bridged into the environment the agent reads) and `APP_PASSWORD` (the shared demo password) in the app's *Settings → Secrets*.
 
 Deploy steps (one-time): push to GitHub → [share.streamlit.io](https://share.streamlit.io) → *New app* → pick this repo and `streamlit_app.py` → set the `OPENROUTER_API_KEY` secret → Deploy.
 
@@ -256,13 +258,25 @@ Keyword BM25 scores are fused with dense scores by reciprocal-rank fusion. This 
 
 ## Task 7: Next Steps
 
-_TODO: what to keep for Demo Day (the CAS join, the brief corpus, the safety boundary) and what to expand (full status matrix via the bulk loaders, more product categories, richer memory), with reasoning._
+**What to keep for Demo Day** (the parts that make it work and that a base model can't fake):
+
+- **The CAS-keyed spine.** Reconciling four regulators through the CAS number is the moat: the cross-walk exists in no single source, and it is what lets the app answer "one product, four regulators" questions correctly. This is the hard, differentiating asset.
+- **The per-additive brief corpus and the three-lane routing.** Distilled evidence prose that lives in no database (RAG), plus a structured store for exact facts and live APIs for what's current. Routing each question to the right lane is what keeps answers both precise and grounded.
+- **The safety boundary.** Keeping legal status, hazard, and personal harm distinct, and refusing a medical verdict, held at **0.955** in the eval. It is enforced in the schema and the prompt, not left to the model's goodwill, and it is the difference between a useful safety tool and a liability.
+- **The evaluation harness itself.** The gold set, the LLM-judge, and the retrieval before/after tables are what turn "it seems to work" into measured claims, and they make every future change checkable.
+
+**What to change or improve**, in priority order set by the evaluation evidence:
+
+1. **Close the status-coverage gap** by finishing the four bulk loaders (`fda/eu/iarc/prop65`). The eval is explicit that this gap is the main cap on answer correctness (additives with no curated row force a correct-but-empty "no status recorded"), so it is the single highest-leverage change, not more model tuning.
+2. **Route by query type in retrieval.** The eval showed hybrid helps exact-token queries but can regress on purely semantic ones, so the honest next step is to send bare-ID and citation lookups to the store lane / hybrid and semantic "why" questions to dense+reranker, rather than one retriever for all.
+3. **Persist and enrich memory.** Memory is per-session on the current host (the filesystem resets on reboot); moving it to durable storage, then adding cumulative daily-intake tracking against ADI limits (the schema already supports it), would unlock the "am I over a safe limit today?" story fully.
+4. **Broaden scope** beyond US candy to another category, cheap to do once the loaders make coverage automatic.
 
 ---
 
 ## Final submission checklist
 
-- [ ] Public GitHub repo (all code)
-- [ ] Written document addressing every deliverable and question (this file)
+- [x] Public GitHub repo (all code)
+- [x] Written document addressing every deliverable and question (this file)
 - [ ] ≤10-minute Loom demo video showing a live tool call and describing the use case
-- [ ] Public deployment URL reachable on phone and laptop
+- [x] Public deployment URL reachable on phone and laptop

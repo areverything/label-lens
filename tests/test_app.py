@@ -67,6 +67,31 @@ def test_clicking_an_example_chip_answers_that_question():
     assert any(CANNED in md.value for md in at.markdown)
 
 
+def test_password_gate_blocks_until_correct():
+    at = AppTest.from_file(APP)
+    at.secrets["APP_PASSWORD"] = "s3cret"
+    at.run(timeout=30)
+    assert not at.exception
+    # Gated: the chat input is not rendered, so nothing can call the model.
+    assert len(at.chat_input) == 0
+
+    # Wrong password stays gated.
+    at.text_input[0].set_value("nope")
+    next(b for b in at.button if b.label == "Enter").click().run(timeout=30)
+    assert len(at.chat_input) == 0
+
+    # Correct password unlocks the app.
+    at.text_input[0].set_value("s3cret")
+    next(b for b in at.button if b.label == "Enter").click().run(timeout=30)
+    assert len(at.chat_input) == 1
+
+
+def test_no_password_secret_leaves_app_open():
+    at = AppTest.from_file(APP).run(timeout=30)  # no APP_PASSWORD set
+    assert not at.exception
+    assert len(at.chat_input) == 1  # open, chat available
+
+
 def test_example_chips_do_not_linger_after_answering():
     """Regression: chips rendered before the answer was appended lingered one
     render, then swallowed the next click and re-showed the old Q&A."""

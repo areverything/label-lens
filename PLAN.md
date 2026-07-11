@@ -10,15 +10,14 @@ Where the project stands and what's built next, in dependency order. For *how an
 
 **Also built:** the **evaluation harness** (Milestone 4). A 22-question gold set (`evals/gold.jsonl`), an LLM-judge (correctness / groundedness / safety), RAGAS (context precision/recall, faithfulness, answer relevancy), and a retrieval before/after comparison. Baseline recorded in `evals/results.json`; the reranker lifts Hit@1 0.75 → 0.85 and MRR 0.81 → 0.90, hybrid BM25+dense also lifts Hit@1 to 0.85. Tasks 5 and 6 answered with numbers in SUBMISSION.
 
-**Pending a one-time action:** the public deployment. The app is packaged and ready; deploying needs a Streamlit Community Cloud login and the `OPENROUTER_API_KEY` secret (runbook in [SUBMISSION §4.2](./docs/SUBMISSION.md#42-public-deployment)).
+**Deployed:** live and public at https://label-lens.streamlit.app/ (Streamlit Community Cloud), password-gated to protect the LLM key, opens on phone and laptop. Task 7 reflection written. The repo is public.
 
-**Not yet built:** the Task 7 next-steps reflection and the final submission items (Loom video, top-of-doc links).
+**Only remaining:** the ≤10-minute Loom demo video (then paste its link at the top of SUBMISSION.md).
 
 ### Next session: start here
 
-1. **Deploy** (5-minute manual step): push, then at [share.streamlit.io](https://share.streamlit.io) create the app from this repo + `streamlit_app.py`, set the `OPENROUTER_API_KEY` secret, and paste the URL into [SUBMISSION §4.2](./docs/SUBMISSION.md#42-public-deployment) and the top of SUBMISSION.
-2. **Milestone 5** (package and submit): write the Task 7 reflection, record the ≤10-minute Loom demo (show a live tool call), confirm the repo is public, and fill the video/URL links at the top of SUBMISSION.
-3. Optional, lower priority: close the status-coverage gap with the bulk loaders (`fda/eu/iarc/prop65`); the eval shows this gap is what caps answer correctness, so it is the highest-leverage quality improvement.
+1. **Record the Loom demo** (≤10 min): describe the use case, then a live walk-through including one live tool call (the recall / Federal Register lane). Paste the link into the top of [SUBMISSION.md](./docs/SUBMISSION.md) and check the final row.
+2. Optional, lower priority: close the status-coverage gap with the bulk loaders (`fda/eu/iarc/prop65`); the eval shows this gap is what caps answer correctness, so it is the highest-leverage quality improvement.
 
 Notes for a fresh clone: the DuckDB store (`data/label_lens.duckdb`) and the Chroma index (`data/chroma/`) are local and gitignored, so rebuild them with `build_spine.py` then `load_products.py` then `build_briefs.py` then `build_index.py`. Open Food Facts' API is intermittently flaky (503); the loader uses the reliable category-based query and retries, but a small batch (`load_products.py 100`) is more likely to slip through than 400. The OpenRouter key is in `.env.local` (gitignored, stays on this machine).
 
@@ -57,7 +56,7 @@ Five milestones in dependency order (each one needs the previous). No dates: thi
 
 ### Milestone 3: The app, in a browser, public
 
-**Status: UI done, deploy pending a one-time login.** The Streamlit chat app (`streamlit_app.py`) is built, driven headlessly by AppTest, and packaged for Community Cloud (committed DuckDB, `requirements.txt`, ONNX embeddings so no torch, secrets bridge, index built on first boot). Only the manual deploy step remains.
+**Status: done.** The Streamlit chat app (`streamlit_app.py`) is built, driven headlessly by AppTest, and **deployed live at https://label-lens.streamlit.app/** (Community Cloud, password-gated to protect the LLM key, opens on phone and laptop).
 
 **Goal:** make it usable and reachable, the cheap way.
 
