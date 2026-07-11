@@ -41,8 +41,10 @@ CREATE TABLE IF NOT EXISTS product (
     countries        TEXT,
     additives_tags   TEXT,                  -- comma-joined en:e### tags
     ingredients_text TEXT,
-    off_url          TEXT,
-    image_url        TEXT                    -- Open Food Facts front image (backfilled)
+    off_url          TEXT
+    -- Product front images live in data/product_images.json (barcode -> URL), not
+    -- here: the committed DB is mutated at runtime, so a new binary column may not
+    -- survive a redeploy; a committed text sidecar always does.
 );
 
 -- User memory: one diet/allergy profile row per user, plus an append-only log of
