@@ -444,87 +444,79 @@ def _product_grid(items: list[dict], in_pantry: set[str], *, key_prefix: str,
 
 
 # --- Background activity log ------------------------------------------------
-# The agent routes each question to a lane (Store / RAG / live government API).
-# We surface the real steps it took in two places: a "What happened" expander
-# under each answer, and a session-wide console at the foot of the app. Both
-# read the same trace produced by the agent, so they show what actually ran.
-
-_LANE_COLOR = {
-    "Store": "#4c8bf5",
-    "RAG": "#22a06b",
-    "Answer": "#9aa0aa",
-}
+# The agent answers by checking official sources one step at a time. We show the
+# real steps it took, in plain English, in two places: a "How it found this
+# answer" panel under each reply, and a session-wide log at the foot of the app.
+# Both read the same trace, so they show what actually ran.
 
 
-def _lane_badge(lane: str) -> str:
-    """A small coloured lane pill. Live lanes share the amber colour."""
-    color = _LANE_COLOR.get(lane, "#e0913a" if lane.startswith("Live") else "#9aa0aa")
-    return (f'<span style="background:{color}22;color:{color};border:1px solid '
-            f'{color}66;border-radius:6px;padding:1px 7px;font-size:0.72rem;'
-            f'font-weight:600;white-space:nowrap">{html.escape(lane)}</span>')
-
-
-def _step_html(step: dict) -> str:
-    """One trace step as a compact HTML line: lane badge, call, result, tags."""
-    tags = " · ".join(step.get("tags") or [])
-    tag_html = (f'<span style="color:#8a8f98"> ⟶ <em>{html.escape(tags)}</em></span>'
-                if tags else "")
-    call = step.get("call") or "answer composed"
-    result = step.get("result") or ""
-    arrow = "✓" if step.get("kind") == "answer" else "→"
-    return (
-        '<div style="margin:3px 0;font-size:0.82rem;line-height:1.4">'
-        f'{_lane_badge(step.get("lane", ""))} '
-        f'<code style="font-size:0.78rem">{html.escape(call)}</code>'
-        f'{tag_html}<br>'
-        f'<span style="color:#9aa0aa;padding-left:1.1rem">{arrow} '
-        f'{html.escape(result)}</span></div>'
-    )
+def _steps_html(trace: list[dict]) -> str:
+    """Render the ordered steps: numbered actions, plain results, why-it-matters."""
+    parts, n = [], 0
+    for s in trace:
+        if s.get("final"):
+            marker = s["icon"]
+        else:
+            n += 1
+            marker = f'<span style="color:#8a8f98">{n}.</span> {s["icon"]}'
+        body = "".join(
+            f'<div style="color:#c9ccd1;font-size:0.88rem;line-height:1.45;'
+            f'padding-left:1.9rem;margin-top:2px">{html.escape(line)}</div>'
+            for line in s.get("lines") or [])
+        note = ""
+        if s.get("note"):
+            note = (f'<div style="color:#8a8f98;font-size:0.8rem;font-style:italic;'
+                    f'padding-left:1.9rem;margin-top:3px">Why it matters: '
+                    f'{html.escape(s["note"])}</div>')
+        parts.append(
+            f'<div style="margin:0.7rem 0">'
+            f'<div style="font-weight:600;font-size:0.94rem">{marker} '
+            f'{html.escape(s["title"])}</div>{body}{note}</div>')
+    return "".join(parts)
 
 
 def _trace_expander(trace: list[dict] | None) -> None:
-    """Collapsible "What happened" panel under a single assistant reply."""
+    """Collapsible "How it found this answer" panel under one assistant reply."""
     if not trace:
         return
-    n = sum(1 for s in trace if s.get("kind") == "tool")
-    label = f"🔍 What happened · {n} background step{'s' if n != 1 else ''}"
+    n = sum(1 for s in trace if not s.get("final"))
+    label = f"🔍 How it found this answer · {n} step{'s' if n != 1 else ''}"
     with st.expander(label, expanded=False):
-        st.markdown("".join(_step_html(s) for s in trace), unsafe_allow_html=True)
+        st.caption("Label Lens answers by checking official sources one step at a "
+                   "time. Here's exactly what it did:")
+        st.markdown(_steps_html(trace), unsafe_allow_html=True)
 
 
 def _record_activity(question: str, trace: list[dict]) -> None:
-    """Append this question's run to the session-wide activity console."""
+    """Append this question's run to the session-wide activity log."""
     st.session_state.setdefault("activity_log", []).append(
         {"time": time.strftime("%H:%M:%S"), "question": question, "trace": trace})
 
 
 def _footer_log() -> None:
-    """The app-wide activity console, pinned at the foot of every tab.
+    """The app-wide activity log, at the foot of every tab.
 
-    Shows, newest first, what the agent did in the background for each question:
-    the lane it routed to, the query, the result, and the requirement each step
-    demonstrates. It's the same trace the per-answer panel shows, accumulated.
+    Shows, newest first, what the app did behind the scenes for each question:
+    the sources it checked, what it found, and why each step matters. Same trace
+    the per-answer panel shows, accumulated across the session.
     """
     log = st.session_state.get("activity_log", [])
     st.divider()
-    title = f"⚙️ Background activity log · {len(log)} question{'s' if len(log) != 1 else ''} this session"
+    title = f"📋 Activity log · {len(log)} question{'s' if len(log) != 1 else ''} this session"
     with st.expander(title, expanded=False):
-        st.caption(
-            "A live trace of the agent working: which lane each question was "
-            "routed to (Store lookup, RAG evidence, or a live government API), "
-            "the query it ran, what came back, and the requirement each step meets."
-        )
+        st.caption("A plain-language record of what the app did behind the scenes "
+                   "for each question you asked.")
         if not log:
-            st.caption("No questions yet. Ask something in the **Chat** tab.")
+            st.caption("Nothing yet. Ask a question in the **Chat** tab and it'll "
+                       "show up here.")
             return
         for entry in reversed(log):
             st.markdown(
-                f'<div style="margin-top:0.6rem;font-size:0.86rem">'
+                f'<div style="margin-top:0.9rem;font-size:0.92rem">'
                 f'<span style="color:#8a8f98">{entry["time"]}</span> · '
                 f'<strong>{html.escape(entry["question"])}</strong></div>',
                 unsafe_allow_html=True)
-            st.markdown("".join(_step_html(s) for s in entry["trace"]),
-                        unsafe_allow_html=True)
+            st.markdown(_steps_html(entry["trace"]), unsafe_allow_html=True)
 
 
 def _suggestion_chips() -> None:
