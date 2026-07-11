@@ -38,6 +38,7 @@ except Exception:
 from label_lens.agent import memory  # noqa: E402
 from label_lens.agent.graph import answer  # noqa: E402
 from label_lens.agent.tools import _con  # noqa: E402
+from label_lens.config import DATA  # noqa: E402
 from label_lens.rag.index import ensure_index  # noqa: E402
 
 st.set_page_config(page_title="Label Lens", page_icon="🔎", layout="centered")
@@ -67,14 +68,28 @@ CHIPS_SHOWN = 4
 
 
 @st.cache_resource
+def _product_images() -> dict[str, str]:
+    """barcode -> front-image URL, from a committed JSON sidecar.
+
+    Images live in a text file, not the DuckDB, so they deploy cleanly: the
+    committed DB is mutated at runtime (memory tables) and a dirtied binary can
+    be skipped by the host's git update, but a JSON file always updates.
+    """
+    import json
+    path = DATA / "product_images.json"
+    return json.loads(path.read_text()) if path.exists() else {}
+
+
+@st.cache_resource
 def _products() -> list[dict]:
     """Every product with additives: name, barcode, image URL, additive tags."""
+    images = _product_images()
     rows = _con().execute(
-        """SELECT name, barcode, image_url, additives_tags FROM product
+        """SELECT name, barcode, additives_tags FROM product
            WHERE name IS NOT NULL AND additives_tags <> ''
            ORDER BY name""").fetchall()
-    return [{"name": n, "barcode": b, "image": img, "additives": tags}
-            for n, b, img, tags in rows]
+    return [{"name": n, "barcode": b, "image": images.get(b), "additives": tags}
+            for n, b, tags in rows]
 
 
 def _codes(additives_tags: str) -> str:
