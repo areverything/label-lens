@@ -41,7 +41,8 @@ CREATE TABLE IF NOT EXISTS product (
     countries        TEXT,
     additives_tags   TEXT,                  -- comma-joined en:e### tags
     ingredients_text TEXT,
-    off_url          TEXT
+    off_url          TEXT,
+    image_url        TEXT                    -- Open Food Facts front image (backfilled)
 );
 
 -- User memory: one diet/allergy profile row per user, plus an append-only log of
