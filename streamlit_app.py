@@ -515,70 +515,85 @@ def _product_grid(items: list[dict], in_pantry: set[str], *, key_prefix: str,
 # Both read the same trace, so they show what actually ran.
 
 
+# One text size for every sans line in the log; only code (the function call and
+# the exact query) uses monospace, set off by a subtle background chip. Colours
+# inherit the theme's text colour and use opacity for muting, so the log reads in
+# both light and dark themes (the viewer chooses).
+_TXT = "font-size:0.9rem;line-height:1.5"
+_MONO = ("font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:0.82rem;"
+         "background:rgba(128,128,128,0.15);border-radius:3px;padding:0 4px")
+
+
 def _agent_header() -> str:
     """One-time reviewer banner naming the agent framework and the model."""
     info = graph_agent_info()
     return (
-        '<div style="font-size:0.79rem;color:#8a8f98;margin:2px 0 8px;'
-        'padding:7px 11px;border-left:2px solid #4a4f57;'
-        'background:rgba(255,255,255,0.03);border-radius:4px;line-height:1.5">'
-        f'🤖 <strong>Agent:</strong> {html.escape(info["framework"])} · '
-        f'<strong>model</strong> <code style="color:#c9a86a">{html.escape(info["model"])}</code>'
-        f'<br><span style="color:#7f8792">{html.escape(info["note"])}</span></div>'
+        f'<div style="{_TXT};margin:2px 0 10px;padding:8px 11px;'
+        'border-left:2px solid rgba(128,128,128,0.5);background:rgba(128,128,128,0.08);'
+        'border-radius:4px">'
+        f'<strong>Agent:</strong> {html.escape(info["framework"])} · '
+        f'<strong>Model:</strong> <code style="{_MONO}">'
+        f'{html.escape(info["model"])}</code>'
+        f'<br><span style="opacity:0.75">{html.escape(info["note"])}</span></div>'
     )
 
 
-def _tech_html(step: dict) -> str:
-    """One consolidated reviewer block per step: the tool called, the technique,
-    and the exact call, all together. The agent framework/model live once in the
-    banner, so they are not repeated here."""
+def _val(text: str) -> str:
+    """One value line under a subsection label (inherits the theme text colour)."""
+    return f'<div style="{_TXT};padding-left:0.9rem">{html.escape(text)}</div>'
+
+
+def _labeled(label: str, value_html: str) -> str:
+    """A subsection: a muted bold label with its value(s) beneath."""
+    return (f'<div style="margin-top:7px">'
+            f'<div style="{_TXT};font-weight:600;opacity:0.6">{label}</div>'
+            f'{value_html}</div>')
+
+
+def _tech_value_html(step: dict) -> str:
+    """Value for the "Tool and technique used" subsection: the tool call and the
+    technique on one line, the exact call (monospace) beneath."""
     t = step.get("tech") or {}
     technique, call = t.get("technique", ""), t.get("call", "")
     tool, query = step.get("tool"), step.get("query")
-    if not technique and not call and not tool:
-        return ""
-    head = ""
     if tool:
         label = f'{tool}("{query}")' if query else tool
-        head = f'<code style="font-size:0.78rem;color:#c9a86a">{html.escape(label)}</code>'
+        head = f'<code style="{_MONO}">{html.escape(label)}</code>'
         if technique:
-            head += f' · {html.escape(technique)}'
-    elif technique:
-        head = html.escape(technique)
-    rows = f'<div>🔧 {head}</div>'
+            head += f' <span style="opacity:0.8">· {html.escape(technique)}</span>'
+    else:
+        head = f'<span style="opacity:0.8">{html.escape(technique)}</span>'
+    out = f'<div style="{_TXT};padding-left:0.9rem">{head}'
     if call:
-        rows += (f'<div style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;'
-                 f'color:#9aa2ad;word-break:break-word;padding-left:1.25rem;'
-                 f'margin-top:1px">↳ {html.escape(call)}</div>')
-    return (f'<div style="padding-left:1.9rem;margin-top:5px;font-size:0.77rem;'
-            f'color:#8a8f98;line-height:1.45;border-left:2px solid #33373e;'
-            f'margin-left:0.2rem;padding:2px 0 2px 0.5rem">{rows}</div>')
+        out += (f'<div style="{_MONO};word-break:break-word;line-height:1.7;'
+                f'display:inline-block;margin-top:3px">↳ {html.escape(call)}</div>')
+    return out + '</div>'
 
 
 def _steps_html(trace: list[dict]) -> str:
-    """Render the ordered steps: numbered plain actions, plain results, a
-    why-it-matters note, then one consolidated technical block for reviewers."""
+    """Render each step as labelled subsections: What it did / What it found /
+    Why it matters / Tool and technique used. No emojis; one consistent font;
+    colours inherit the theme so it reads in light and dark."""
     parts, n = [], 0
     for s in trace:
         if s.get("final"):
-            marker = s["icon"]
+            marker = "Answer"
+            found: list[str] = []
+            why = s.get("lines") or []          # the closing cited/safety lines
         else:
             n += 1
-            marker = f'<span style="color:#8a8f98">{n}.</span> {s["icon"]}'
-        body = "".join(
-            f'<div style="color:#c9ccd1;font-size:0.88rem;line-height:1.45;'
-            f'padding-left:1.9rem;margin-top:2px">{html.escape(line)}</div>'
-            for line in s.get("lines") or [])
-        note = ""
-        if s.get("note"):
-            note = (f'<div style="color:#8a8f98;font-size:0.8rem;font-style:italic;'
-                    f'padding-left:1.9rem;margin-top:3px">Why it matters: '
-                    f'{html.escape(s["note"])}</div>')
-        parts.append(
-            f'<div style="margin:0.7rem 0">'
-            f'<div style="font-weight:600;font-size:0.94rem">{marker} '
-            f'{html.escape(s["title"])}</div>'
-            f'{body}{note}{_tech_html(s)}</div>')
+            marker = f"Step {n}"
+            found = s.get("lines") or []
+            why = [s["note"]] if s.get("note") else []
+        seg = [f'<div style="{_TXT};font-weight:700;opacity:0.8">{marker}</div>']
+        seg.append(_labeled("What it did", _val(s["title"])))
+        if found:
+            seg.append(_labeled("What it found", "".join(_val(x) for x in found)))
+        if why:
+            seg.append(_labeled("Why it matters", "".join(_val(x) for x in why)))
+        if s.get("tool") or (s.get("tech") or {}).get("technique"):
+            seg.append(_labeled("Tool and technique used", _tech_value_html(s)))
+        parts.append(f'<div style="margin:1rem 0 0.3rem">{"".join(seg)}</div>')
     return "".join(parts)
 
 
@@ -587,12 +602,8 @@ def _trace_expander(trace: list[dict] | None) -> None:
     if not trace:
         return
     n = sum(1 for s in trace if not s.get("final"))
-    label = f"🔍 How it found this answer · {n} step{'s' if n != 1 else ''}"
+    label = f"How it found this answer · {n} step{'s' if n != 1 else ''}"
     with st.expander(label, expanded=False):
-        st.caption("Label Lens answers by checking official sources one step at a "
-                   "time. Each step shows what it did (in plain terms), what it "
-                   "found, and a 🔧 technical line for reviewers (the tool, the "
-                   "technique, and the exact call).")
         st.markdown(_agent_header(), unsafe_allow_html=True)
         st.markdown(_steps_html(trace), unsafe_allow_html=True)
 
@@ -612,11 +623,8 @@ def _footer_log() -> None:
     """
     log = st.session_state.get("activity_log", [])
     st.divider()
-    title = f"📋 Activity log · {len(log)} question{'s' if len(log) != 1 else ''} this session"
+    title = f"Activity log · {len(log)} question{'s' if len(log) != 1 else ''} this session"
     with st.expander(title, expanded=False):
-        st.caption("A record of what the app did behind the scenes for each "
-                   "question: plain-language steps for everyone, plus a 🔧 "
-                   "technical line (tool, technique, exact call) for reviewers.")
         if not log:
             st.caption("Nothing yet. Ask a question in the **Chat** tab and it'll "
                        "show up here.")
