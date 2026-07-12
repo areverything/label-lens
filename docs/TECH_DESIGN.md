@@ -34,11 +34,22 @@ To build and inspect it, see the [Quick Start](../README.md#quick-start).
 
 **One brief per additive, split on its labelled sections** (identity / regulatory status / evidence). We chose section-based chunks over fixed-size chunks because user questions map cleanly onto those sections ("is it banned" → status; "is it dangerous" → evidence), so each retrieved passage is self-contained and keeps its citation intact. Fixed-size chunks would cut across a citation and mix a legal fact with an evidence claim, which is exactly the conflation the app must avoid. The corpus is small (tens of additives), so this stays simple and needs no elaborate hierarchy.
 
+### Brief generation (the RAG corpus)
+
+`scripts/build_briefs.py` writes one markdown brief per additive *after* the store is built (`build_spine.py` first). It is a deliberate split of deterministic rendering and a tightly-constrained LLM (`src/label_lens/briefs/`):
+
+- **Identity** and **Regulatory status** are rendered straight from the `additives` and `regulatory_status` tables (`assemble.py` gathers `Facts`, `generate.py` prints the section), so they cannot be hallucinated and every status row keeps its citation.
+- **Evidence** is the *only* LLM-written section. The model gets a *facts block* in which each line already carries its citation, under a strict system prompt: use only the provided facts, cite every claim, never invent a fact or citation, keep legal status / hazard / harm separate, give no medical advice, and if a jurisdiction has no row say it is "not yet compiled" rather than infer one. The call goes through the OpenRouter gateway; the model is swappable.
+- Output is one `E###.md` per additive in `data/briefs/`, split on the `##` headings the chunker reads.
+
+Traced for titanium dioxide: `slice.py` scope entry → OFF taxonomy (name, class, Wikidata QID `Q193521`) → Wikidata `P231` (CAS `13463-67-7`) → `spine.py` writes the `additives` row (flagged `ambiguous_cas`; Wikidata lists two CAS) → `regulatory_seed.py` writes three cited `regulatory_status` rows (EU banned, US permitted, IARC not-classified) → `assemble.py` reads them into `Facts` → `generate.py` renders Identity + Status from the table and sends the cited facts block to the LLM for the Evidence prose → `data/briefs/E171.md`.
+
 ## Technology choices and tradeoffs
 
 The per-component list with a one-line justification each (a graded deliverable) is in [SUBMISSION §2.2](./SUBMISSION.md#22-infrastructure). This section covers only the choices that deserve more than a sentence.
 
 - **Vector store, Chroma over Qdrant.** The brief corpus is tiny, so an embedded, file-based store with nothing to run or host beats a server like Qdrant. If the corpus grew by orders of magnitude, Qdrant's filtering and scale would justify the operational cost; here they don't.
+- **Briefs as individual markdown files, over one document or PDFs.** One `.md` per additive (split into three sections) keeps each retrieved passage mapped to exactly one additive and one section, so its citation and identity stay intact and a correction touches one small, git-diffable file; a single monolith would force chunk boundaries that straddle additives or blend a legal fact with an evidence claim. Markdown over PDF because the briefs *are* the retriever's text (no lossy PDF extraction step), the `#` / `##` headings are what the chunker parses (a PDF's layout is visual, not structural), and `.md` diffs cleanly in review where a PDF is an opaque binary. A PDF would only make sense if a source of truth were itself a PDF; here we generate the corpus, so we generate it in the format the pipeline consumes.
 - **Embeddings and reranking, local via ONNX over an API.** `bge-small` embeddings (and later the `bge-reranker`) run locally through fastembed's ONNX runtime, no torch and no external API. ONNX on CPU is fast enough because the corpus and the per-query candidate set are tiny, and it keeps the deploy light: torch's default Linux wheel drags in ~2 GB of CUDA libraries that a CPU-only free-tier host neither needs nor can afford, so avoiding torch is what makes the same code run unchanged locally and on Streamlit Community Cloud. The retrieval ladder stays cost-free and offline-capable; the only calls that must go through the paid gateway are the LLM's.
 - **LLM gateway, OpenRouter.** The certification requires routing model calls through a gateway rather than a raw provider. OpenRouter gives one key and swappable models behind a single endpoint with minimal code, which lets us tune the model for cost vs quality during evals without touching application code.
 - **UI + deployment, Streamlit + Community Cloud.** One design decision satisfies three requirements at once: a browser UI, one that works on phone and laptop, and a public endpoint. Streamlit is a single Python file; Community Cloud gives a free public URL. A hand-built FastAPI + frontend would offer more control over streaming but costs far more code for the same graded outcome.
@@ -53,7 +64,17 @@ The per-component list with a one-line justification each (a graded deliverable)
 
 ## Scope
 
-Deliberately small, so the cross-source join is hand-verifiable: **28 additives** (mostly synthetic colors, plus marquee preservatives, sweeteners, and California's banned set) within **one product category, US candy / confectionery**. Small scope is a feature here: it lets every CAS match and every cited status row be checked by hand, which is what makes the app trustworthy rather than plausible.
+Deliberately small, so the cross-source join is hand-verifiable: **28 additives** within **one product category, US candy / confectionery**.
+
+**Where the 28 come from.** They are a **hand-selected list** in `src/label_lens/slice.py`, not drawn from a dataset. Each additive earns its place by a *regulatory hook* recorded next to it: a specific reason regulators disagree, or a notable hazard classification. They cluster into:
+
+- **Synthetic colours** (11): the sharpest EU / FDA / California divergence, including the "Southampton Six" child-hyperactivity dyes (E102, E110, E129, ...), titanium dioxide (E171, EU-banned but FDA-permitted), and erythrosine (E127, FDA-revoked 2025). Two low-divergence controls (E132, E133) are included on purpose.
+- **Preservatives** (7): nitrites/nitrates (cured-meat / IARC processed-meat context), sulfur dioxide, and the benzoic-acid / sodium-benzoate pair (E210, E211) kept as a near-duplicate retrieval-reranking test.
+- **Antioxidants** (2): BHA (IARC 2B, Prop 65) and BHT.
+- **Sweeteners** (5): aspartame (IARC 2B, 2023), cyclamates (FDA-banned 1969), saccharin, and others.
+- **The non-colour members of California's AB 418 (2023) ban** (3): propylparaben, brominated vegetable oil, potassium bromate.
+
+So the *scope* is curated by hand (chosen for regulatory divergence and for the evaluation design), while the *chemistry* is resolved from Open Food Facts + Wikidata and the *legal status* comes from primary regulator sources: curated selection, sourced-and-cited facts. Small scope is a feature here: it lets every CAS match and every cited status row be checked by hand, which is what makes the app trustworthy rather than plausible.
 
 ## Repository layout
 
