@@ -149,3 +149,58 @@ def test_missing_data_is_honest():
     store = summarize_run(msgs, msgs[-1].content)[0]
     assert "No official rulings recorded" in _text(store)
     assert "instead of guessing" in store["note"]
+
+
+def _status(cas_line, *rows):
+    return cas_line + "".join("\n" + r for r in rows)
+
+
+def test_many_status_lookups_collapse_into_one_step():
+    """The cumulative "is anything banned?" question fires one lookup per additive.
+    Those collapse into a single step: the technique is shown once, the misses roll
+    up, and no per-additive step repeats the same SQL call verbatim."""
+    lookups = {
+        "E102": _status("Tartrazine (E102, CAS 1934-21-0):",
+                        "- EU: authorised_warning — warning [Annex V, as of 2024]",
+                        "- US_FDA: permitted — allowed [21 CFR 74.705, as of 2024]"),
+        "E133": _status("Brilliant Blue (E133, CAS 3844-45-9):",
+                        "- EU: authorised — allowed [Annex II, as of 2024]",
+                        "- US_FDA: permitted — allowed [21 CFR 74.101, as of 2024]"),
+        "E322": "No additive found matching 'E322'.",
+        "E414": "No additive found matching 'E414'.",
+        "E903": "No additive found matching 'E903'.",
+    }
+    calls = [{"name": "additive_status", "args": {"term": t}, "id": t}
+             for t in lookups]
+    msgs = [_ai(calls), *[_tool(t, c) for t, c in lookups.items()],
+            _final("Here is the rundown [cite].")]
+    steps = summarize_run(msgs, msgs[-1].content)
+
+    # One grouped store step (+ the final answer), not one per additive.
+    store_steps = [s for s in steps if not s.get("final")]
+    assert len(store_steps) == 1
+    g = store_steps[0]
+    assert "5 additives" in g["title"]
+    # The three out-of-scope codes roll into a single line, not three misses.
+    rolled = [ln for ln in g["lines"] if "E322" in ln and "E414" in ln and "E903" in ln]
+    assert len(rolled) == 1 and "curated" in rolled[0]
+    # Divergent additive is flagged; the SQL technique is named once.
+    assert any("E102" in ln and "regulators differ" in ln for ln in g["lines"])
+    assert "run once per additive" in g["tech"]["technique"]
+    assert "DuckDB" in g["tech"]["call"]
+
+
+def test_agreeing_regulators_are_not_flagged_as_divergent():
+    """"authorised" (EU) and "permitted" (US) are different codes that both mean
+    "Allowed", so an additive both regulators allow must not read as a divergence."""
+    msgs = [
+        _ai([{"name": "additive_status", "args": {"term": "E133"}, "id": "a"}]),
+        _tool("a", _status("Brilliant Blue (E133, CAS 3844-45-9):",
+                           "- EU: authorised — allowed [Annex II, as of 2024]",
+                           "- US_FDA: permitted — allowed [21 CFR 74.101, as of 2024]")),
+        _final("Both allow Blue 1 [cite]."),
+    ]
+    store = summarize_run(msgs, msgs[-1].content)[0]
+    assert "European Union: Allowed" in store["lines"]
+    assert "US FDA: Allowed" in store["lines"]
+    assert store["note"] == ""  # no "different decisions" note

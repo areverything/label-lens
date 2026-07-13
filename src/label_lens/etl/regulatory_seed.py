@@ -31,6 +31,12 @@ SEED: tuple[tuple[str, str, str, str, str, str], ...] = (
     ("E129", "EU", "authorised_warning", "Southampton dye; requires child-attention warning label.", "Reg (EC) 1333/2008 Annex V", "2024-01-01"),
     ("E129", "US_FDA", "permitted", "Listed color additive (FD&C Red No. 40).", "21 CFR 74.340", "2024-01-01"),
 
+    # Blues both regulators authorise -- the "they agree here" control alongside the Southampton dyes
+    ("E132", "EU", "authorised", "Authorised food colour under Annex II conditions; no child-attention warning required.", "Reg (EC) 1333/2008 Annex II", "2024-01-01"),
+    ("E132", "US_FDA", "permitted", "Listed color additive (FD&C Blue No. 2), certification required.", "21 CFR 74.102", "2024-01-01"),
+    ("E133", "EU", "authorised", "Authorised food colour under Annex II conditions; no child-attention warning required.", "Reg (EC) 1333/2008 Annex II", "2024-01-01"),
+    ("E133", "US_FDA", "permitted", "Listed color additive (FD&C Blue No. 1), certification required.", "21 CFR 74.101", "2024-01-01"),
+
     # Colours EU-authorised but not FDA-approved for food
     ("E104", "US_FDA", "not_approved", "Not an approved color additive for food in the US.", "21 CFR 74 (absent)", "2024-01-01"),
     ("E122", "US_FDA", "not_approved", "Not an approved color additive for food in the US.", "21 CFR 74 (absent)", "2024-01-01"),
