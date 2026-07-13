@@ -8,6 +8,7 @@ cannot conflate them.
 """
 from __future__ import annotations
 
+import threading
 from functools import lru_cache
 
 import duckdb
@@ -19,9 +20,34 @@ from label_lens.rag.retrieve import retrieve
 
 
 @lru_cache(maxsize=1)
-def _con() -> duckdb.DuckDBPyConnection:
+def _base_con() -> duckdb.DuckDBPyConnection:
+    """The one real connection that owns the database file (and its lock)."""
     con = duckdb.connect(str(DB_PATH))
     memory.ensure_memory_tables(con)
+    return con
+
+
+_local = threading.local()
+_cursor_lock = threading.Lock()
+
+
+def _con() -> duckdb.DuckDBPyConnection:
+    """A per-thread DuckDB connection (a cursor over one shared database instance).
+
+    A DuckDB connection is not safe for concurrent queries: two threads sharing it
+    interleave on its single result cursor, so one thread's fetch can return
+    another thread's rows. LangGraph runs the agent's tool calls in a thread pool,
+    so the cumulative question (many additive_status lookups issued at once) hit
+    exactly that race, surfacing as "not enough values to unpack (expected 5, got
+    4)" when a 5-column status fetch picked up a 4-column resolve_additive result.
+    Giving each thread its own cursor keeps result state per-thread; the cursors
+    share one instance, so writes stay visible and no file-lock conflict arises.
+    """
+    con = getattr(_local, "con", None)
+    if con is None:
+        with _cursor_lock:                 # guard the one-time cursor creation
+            con = _base_con().cursor()
+        _local.con = con
     return con
 
 
