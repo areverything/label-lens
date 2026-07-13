@@ -23,6 +23,10 @@ _EMDASH = " — "
 # The embedding model behind the RAG lane (see rag/embed.py). Shown to reviewers.
 _EMBED_MODEL = "BAAI/bge-small-en-v1.5"
 
+# A run of this many consecutive additive_status lookups collapses into one
+# grouped step (the cumulative "is anything banned?" question fires ~10 at once).
+_GROUP_MIN = 3
+
 # Regulator codes -> names a newcomer can read.
 _JURIS = {
     "EU": "European Union",
@@ -80,59 +84,139 @@ def summarize_run(messages: list, reply: str) -> list[dict]:
         if getattr(m, "type", "") == "tool"
     }
     builders = {
-        "additive_status": _store_step,
         "search_briefs": _rag_step,
         "check_recalls": _recalls_step,
         "recent_regulatory_actions": _actions_step,
     }
-    steps: list[dict] = []
+    # Ordered list of the recognised tool calls the agent actually made.
+    calls: list[tuple[str, str, str]] = []
     for m in messages:
         for tc in getattr(m, "tool_calls", None) or []:
+            name = tc.get("name", "")
+            if name != "additive_status" and name not in builders:
+                continue
             args = tc.get("args") or {}
             arg = str(next(iter(args.values()), "")) if args else ""
-            content = results.get(tc.get("id"), "")
-            build = builders.get(tc.get("name", ""))
-            if build:
-                steps.append(build(arg, content))
+            calls.append((name, arg, results.get(tc.get("id"), "")))
+
+    steps: list[dict] = []
+    i = 0
+    while i < len(calls):
+        name, arg, content = calls[i]
+        if name == "additive_status":
+            # Fold a run of consecutive status lookups (the cumulative question
+            # fires one per additive) into a single step so the technique is shown
+            # once, not repeated verbatim for every additive.
+            run = []
+            while i < len(calls) and calls[i][0] == "additive_status":
+                run.append((calls[i][1], calls[i][2]))
+                i += 1
+            if len(run) >= _GROUP_MIN:
+                steps.append(_store_group(run))
+            else:
+                steps.extend(_store_step(term, c) for term, c in run)
+        else:
+            steps.append(builders[name](arg, content))
+            i += 1
     steps.append(_answer_step(reply, tool_calls=bool(steps)))
     return steps
 
 
-def _store_step(term: str, content: str) -> dict:
-    title = f"Looked up the official rulings on “{term}”"
-    kw = {
-        "tool": "additive_status", "query": term,
-        "tech": {
-            "technique": "Deterministic SQL lookup (no LLM)",
-            "call": ("resolve_additive(term) → SELECT jurisdiction, status, detail, "
-                     "citation, as_of FROM regulatory_status WHERE cas = ?  (DuckDB)"),
-        },
-    }
+# The one SQL call the store lane makes, named once and reused by both the single
+# and the grouped step so the reviewer sees the same technique either way.
+_STORE_CALL = ("resolve_additive(term) → SELECT jurisdiction, status, detail, "
+               "citation, as_of FROM regulatory_status WHERE cas = ?  (DuckDB)")
+
+
+def _parse_store(content: str) -> dict:
+    """Read one additive_status result into a small record the step builders share.
+
+    kind is "not_found" (not in our data), "no_rows" (in scope but no rulings yet),
+    or "found"; legal/hazard hold the plain-English per-jurisdiction lines and
+    divergent flags whether the legal calls disagree across regulators.
+    """
     low = content.lower()
     if "no additive found" in low:
-        return _step("⚖️", title, ["We don’t have this additive in our data yet."],
-                     "When data is missing, the app says so instead of guessing.", **kw)
+        return {"kind": "not_found", "legal": [], "hazard": [], "divergent": False}
     if "no regulatory-status rows" in low:
-        return _step("⚖️", title, ["No official rulings recorded for it yet."],
-                     "When data is missing, the app says so instead of guessing.", **kw)
-    legal, hazard, statuses = [], [], set()
+        return {"kind": "no_rows", "legal": [], "hazard": [], "divergent": False}
+    legal, hazard, meanings = [], [], set()
     for line in content.splitlines():
         line = line.strip()
         if line.startswith("- ") and ":" in line:
             juris, rest = line[2:].split(":", 1)
             juris = juris.strip()
             status = rest.split(_EMDASH)[0].split("[")[0].strip()
-            label = f"{_JURIS.get(juris, juris)}: {_STATUS.get(status, status.replace('_', ' ').capitalize())}"
+            plain = _STATUS.get(status, status.replace("_", " ").capitalize())
+            label = f"{_JURIS.get(juris, juris)}: {plain}"
             if juris == "IARC":
                 hazard.append(label)
             else:
                 legal.append(label)
-                statuses.add(status.lower())
-    note = ""
-    if len(statuses) > 1:
-        note = ("Regulators reached different decisions here. The app shows each "
-                "one rather than picking a winner.")
-    return _step("⚖️", title, legal + hazard, note, **kw)
+                # Compare the plain meaning, not the raw code: "authorised" and
+                # "permitted" are different codes that both mean "Allowed", so
+                # they are not a divergence.
+                meanings.add(plain)
+    return {"kind": "found", "legal": legal, "hazard": hazard,
+            "divergent": len(meanings) > 1}
+
+
+def _store_step(term: str, content: str) -> dict:
+    title = f"Looked up the official rulings on “{term}”"
+    kw = {
+        "tool": "additive_status", "query": term,
+        "tech": {"technique": "Deterministic SQL lookup (no LLM)", "call": _STORE_CALL},
+    }
+    p = _parse_store(content)
+    if p["kind"] == "not_found":
+        return _step("⚖️", title, ["We don’t have this additive in our data yet."],
+                     "When data is missing, the app says so instead of guessing.", **kw)
+    if p["kind"] == "no_rows":
+        return _step("⚖️", title, ["No official rulings recorded for it yet."],
+                     "When data is missing, the app says so instead of guessing.", **kw)
+    note = ("Regulators reached different decisions here. The app shows each "
+            "one rather than picking a winner.") if p["divergent"] else ""
+    return _step("⚖️", title, p["legal"] + p["hazard"], note, **kw)
+
+
+def _store_group(items: list[tuple[str, str]]) -> dict:
+    """One step for a run of many status lookups (the cumulative question).
+
+    Additives with rulings get a compact one-line summary each; the two "nothing
+    to report" cases (not in our data / in scope but no rulings yet) roll up into
+    one honest line apiece, so a long list of near-identical misses collapses.
+    """
+    title = f"Checked the official rulings on {len(items)} additives"
+    lines: list[str] = []
+    no_rows, not_found, any_divergent = [], [], False
+    for term, content in items:
+        p = _parse_store(content)
+        if p["kind"] == "not_found":
+            not_found.append(term)
+        elif p["kind"] == "no_rows":
+            no_rows.append(term)
+        else:
+            detail = "; ".join(p["legal"] + p["hazard"])
+            if p["divergent"]:
+                detail += " (regulators differ)"
+                any_divergent = True
+            lines.append(f"{term} — {detail}")
+    if no_rows:
+        lines.append("No rulings recorded yet: " + ", ".join(no_rows) + ".")
+    if not_found:
+        lines.append("Outside our curated 28-additive set, so no cross-jurisdiction "
+                     "ruling to report: " + ", ".join(not_found) + ".")
+    note_bits = []
+    if any_divergent:
+        note_bits.append("Where regulators disagree, the app shows each ruling "
+                         "rather than picking a winner.")
+    if no_rows or not_found:
+        note_bits.append("When an additive isn’t covered, the app says so instead "
+                         "of guessing.")
+    return _step("⚖️", title, lines, " ".join(note_bits),
+                 tool="additive_status", query="",
+                 tech={"technique": "Deterministic SQL lookup (no LLM), run once per "
+                       "additive", "call": _STORE_CALL})
 
 
 def _rag_step(term: str, content: str) -> dict:
