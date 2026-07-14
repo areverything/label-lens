@@ -66,4 +66,48 @@ SEED: tuple[tuple[str, str, str, str, str, str], ...] = (
     ("E924", "IARC", "group_2b", "Potassium bromate classified 'possibly carcinogenic to humans' (Group 2B).", "IARC Monograph Vol. 73", "1999-01-01"),
     ("E924", "US_FDA", "permitted", "Permitted as a flour treatment agent (with limits); FDA has urged voluntary discontinuation.", "21 CFR 136 / 137", "2024-01-01"),
     ("E924", "EU", "not_authorised", "Not authorised as a food additive in the EU/UK.", "Reg (EC) 1333/2008 (not listed)", "2024-01-01"),
+
+    # Remaining in-scope additives, so no candy ingredient in scope returns a
+    # blank status. EU rows sit in the Union list (Reg 1333/2008 Annex II); US
+    # CFR sections verified against eCFR / Cornell LII; IARC groups from the
+    # named monographs. Note the nitrite/nitrate CFR mapping is counter-intuitive
+    # (172.160 is potassium NITRATE; potassium nitrite is prior-sanctioned only).
+
+    # Benzoate preservatives -- both regulators allow; the E210/E211 near-duplicate pair
+    ("E210", "EU", "authorised", "Authorised preservative in the Union list, subject to Annex II conditions of use.", "Reg (EC) 1333/2008 Annex II", "2024-01-01"),
+    ("E210", "US_FDA", "permitted", "GRAS antimicrobial preservative, use not exceeding 0.1 percent.", "21 CFR 184.1021", "2024-01-01"),
+    ("E211", "EU", "authorised", "Authorised preservative in the Union list, subject to Annex II conditions of use.", "Reg (EC) 1333/2008 Annex II", "2024-01-01"),
+    ("E211", "US_FDA", "permitted", "GRAS antimicrobial preservative, use not exceeding 0.1 percent.", "21 CFR 184.1733", "2024-01-01"),
+
+    # Sulfur dioxide -- allowed both sides, but each imposes a different restriction
+    ("E220", "EU", "authorised", "Authorised sulphite preservative; foods above 10 mg/kg must be labelled 'contains sulphites'.", "Reg (EC) 1333/2008 Annex II", "2024-01-01"),
+    ("E220", "US_FDA", "permitted", "GRAS, but not permitted on meats, on recognised vitamin B1 sources, or on raw fruit and vegetables sold as fresh.", "21 CFR 182.3862", "2024-01-01"),
+
+    # Nitrites / nitrates -- EU cut the limits in 2023; IARC 2A is for the endogenous-nitrosation exposure, not the compound
+    ("E249", "EU", "authorised", "Authorised preservative; maximum added amounts lowered by Reg (EU) 2023/2108, reduced levels applying from Oct 2025.", "Reg (EC) 1333/2008 Annex II (amended by Reg (EU) 2023/2108)", "2023-01-01"),
+    ("E249", "US_FDA", "permitted", "Prior-sanctioned colour fixative and preservative in the curing of red meat and poultry.", "21 CFR 181.34", "2024-01-01"),
+    ("E249", "IARC", "group_2a", "Ingested nitrate or nitrite 'under conditions that result in endogenous nitrosation' is probably carcinogenic; the rating is for that exposure condition, not the additive itself.", "IARC Monograph Vol. 94", "2010-01-01"),
+    ("E250", "EU", "authorised", "Authorised preservative; maximum added amounts lowered by Reg (EU) 2023/2108, reduced levels applying from Oct 2025.", "Reg (EC) 1333/2008 Annex II (amended by Reg (EU) 2023/2108)", "2023-01-01"),
+    ("E250", "US_FDA", "permitted", "Permitted preservative and colour fixative in cured and smoked meat and fish, with set limits.", "21 CFR 172.175", "2024-01-01"),
+    ("E250", "IARC", "group_2a", "Ingested nitrate or nitrite 'under conditions that result in endogenous nitrosation' is probably carcinogenic; the rating is for that exposure condition, not the additive itself.", "IARC Monograph Vol. 94", "2010-01-01"),
+    ("E251", "EU", "authorised", "Authorised preservative; maximum added amounts lowered by Reg (EU) 2023/2108, reduced levels applying from Oct 2025.", "Reg (EC) 1333/2008 Annex II (amended by Reg (EU) 2023/2108)", "2023-01-01"),
+    ("E251", "US_FDA", "permitted", "Permitted preservative and colour fixative in cured fish and meat-curing preparations, up to 500 ppm.", "21 CFR 172.170", "2024-01-01"),
+    ("E251", "IARC", "group_2a", "Ingested nitrate or nitrite 'under conditions that result in endogenous nitrosation' is probably carcinogenic; the rating is for that exposure condition, not the additive itself.", "IARC Monograph Vol. 94", "2010-01-01"),
+    ("E252", "EU", "authorised", "Authorised preservative; maximum added amounts lowered by Reg (EU) 2023/2108, reduced levels applying from Oct 2025.", "Reg (EC) 1333/2008 Annex II (amended by Reg (EU) 2023/2108)", "2023-01-01"),
+    ("E252", "US_FDA", "permitted", "Permitted curing agent in cod roe, up to 200 ppm in the finished roe.", "21 CFR 172.160", "2024-01-01"),
+    ("E252", "IARC", "group_2a", "Ingested nitrate or nitrite 'under conditions that result in endogenous nitrosation' is probably carcinogenic; the rating is for that exposure condition, not the additive itself.", "IARC Monograph Vol. 94", "2010-01-01"),
+
+    # BHT -- IARC Group 3, the deliberate contrast to BHA (Group 2B) above
+    ("E321", "EU", "authorised", "Authorised antioxidant in the Union list, subject to Annex II conditions of use.", "Reg (EC) 1333/2008 Annex II", "2024-01-01"),
+    ("E321", "US_FDA", "permitted", "GRAS antioxidant, up to 0.02 percent of the fat or oil content.", "21 CFR 182.3173", "2024-01-01"),
+    ("E321", "IARC", "group_3", "Not classifiable as to carcinogenicity to humans (unlike BHA, which is Group 2B).", "IARC Monograph Vol. 40", "1986-01-01"),
+
+    # Sweeteners -- acesulfame K and sucralose (both allowed); saccharin, whose IARC 2B was withdrawn in 1999
+    ("E950", "EU", "authorised", "Authorised sweetener in the Union list, subject to Annex II conditions of use.", "Reg (EC) 1333/2008 Annex II", "2024-01-01"),
+    ("E950", "US_FDA", "permitted", "Approved as a general-purpose sweetener and flavour enhancer in foods, except in meat and poultry.", "21 CFR 172.800", "2024-01-01"),
+    ("E954", "EU", "authorised", "Authorised sweetener (saccharin and its salts) in the Union list, subject to Annex II conditions.", "Reg (EC) 1333/2008 Annex II", "2024-01-01"),
+    ("E954", "US_FDA", "permitted", "Permitted sweetening agent (saccharin and its ammonium, calcium and sodium salts); the 1970s warning-label requirement was repealed in 2000.", "21 CFR 180.37", "2024-01-01"),
+    ("E954", "IARC", "group_3", "Not classifiable as to carcinogenicity to humans; downgraded from Group 2B in 1999 as the rat-bladder mechanism was found not relevant to humans.", "IARC Monograph Vol. 73", "1999-01-01"),
+    ("E955", "EU", "authorised", "Authorised sweetener in the Union list, subject to Annex II conditions of use.", "Reg (EC) 1333/2008 Annex II", "2024-01-01"),
+    ("E955", "US_FDA", "permitted", "Approved as a sweetener in foods generally, under good manufacturing practice.", "21 CFR 172.831", "2024-01-01"),
 )

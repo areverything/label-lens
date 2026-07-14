@@ -46,7 +46,9 @@ _STATUS = {
     "not_approved": "Not approved",
     "not_authorised": "Not allowed",
     "listed": "Listed as a concern (California Prop 65)",
+    "group_2a": "Rated a probable cause of cancer (IARC Group 2A)",
     "group_2b": "Rated a possible cause of cancer (IARC Group 2B)",
+    "group_3": "Not classifiable as a cancer hazard (IARC Group 3)",
     "not_classified": "Not rated as a cancer hazard",
 }
 
