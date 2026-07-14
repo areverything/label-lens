@@ -20,7 +20,7 @@ uv sync                                          # install dependencies (Python 
 uv run streamlit run streamlit_app.py            # opens http://localhost:8501
 ```
 
-The chat app needs one key to answer questions: put `OPENROUTER_API_KEY=...` in a `.env.local` file at the repo root before running. (Optional: `OPENROUTER_MODEL` to pick the model, `LANGSMITH_API_KEY` to trace each run.)
+The chat app needs one key to answer questions: put `OPENROUTER_API_KEY=...` in a `.env.local` file at the repo root before running. (Optional: `OPENROUTER_MODEL` to pick the model, `LANGSMITH_API_KEY` to trace each run, `SHOW_ACTIVITY_LOG=1` to show the session-wide activity log at the foot of the app; it is hidden by default.)
 
 Prefer the command line? Ask the agent one question directly:
 
