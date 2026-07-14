@@ -4,9 +4,9 @@ Where the project stands and what's built next, in dependency order. For *how an
 
 ## Where we are
 
-**Built:** the CAS store (28 additives resolved to CAS + 32 cited regulatory-status rows), the **28-brief RAG corpus** in `data/briefs/` (committed), **100 US candy products** in the `product` table, the **Chroma vector index** over the briefs, the **working LangGraph agent** (four tools: Store / RAG / openFDA / Federal Register, + user memory, every model call through OpenRouter, LangSmith tracing when a key is set), and the **Streamlit chat UI** (`streamlit_app.py`, deploy-ready for Community Cloud). All six eval question types return cited answers locally. See the [Quick Start](./README.md#quick-start).
+**Built:** the CAS store (28 additives resolved to CAS + 64 cited regulatory-status rows), the **28-brief RAG corpus** in `data/briefs/` (committed), **100 US candy products** in the `product` table, the **Chroma vector index** over the briefs, the **working LangGraph agent** (four tools: Store / RAG / openFDA / Federal Register, + user memory, every model call through OpenRouter, LangSmith tracing when a key is set), and the **Streamlit chat UI** (`streamlit_app.py`, deploy-ready for Community Cloud). All six eval question types return cited answers locally. See the [Quick Start](./README.md#quick-start).
 
-**Partial:** regulatory-status coverage is 15 of 28 additives; the other briefs honestly say "not yet compiled" per jurisdiction.
+**Status coverage:** every in-scope additive (28/28) now has EU and US FDA regulatory-status rows, plus California / IARC rows where a notable ruling or classification exists. Each was primary-source-verified (21 CFR sections against eCFR / Cornell LII, EU rulings against EUR-Lex, IARC groups against the named monographs). The affected briefs were regenerated so the RAG corpus matches the store. Caveat: the recorded eval baseline predates this fill (see Milestone 4).
 
 **Also built:** the **evaluation harness** (Milestone 4). A 22-question gold set (`evals/gold.jsonl`), an LLM-judge (correctness / groundedness / safety), RAGAS (context precision/recall, faithfulness, answer relevancy), and a retrieval before/after comparison. Baseline recorded in `evals/results.json`; the reranker lifts Hit@1 0.75 → 0.85 and MRR 0.81 → 0.90, hybrid BM25+dense also lifts Hit@1 to 0.85. Tasks 5 and 6 answered with numbers in SUBMISSION.
 
@@ -17,7 +17,7 @@ Where the project stands and what's built next, in dependency order. For *how an
 ### Next session: start here
 
 1. **Record the Loom demo** (≤10 min): describe the use case, then a live walk-through including one live tool call (the recall / Federal Register lane). Paste the link into the top of [SUBMISSION.md](./docs/SUBMISSION.md) and check the final row.
-2. Optional, lower priority: close the status-coverage gap with the bulk loaders (`fda/eu/iarc/prop65`); the eval shows this gap is what caps answer correctness, so it is the highest-leverage quality improvement.
+2. Re-run the eval (`evals/`) to remeasure correctness now that status coverage is complete. The recorded baseline in `evals/results.json` and SUBMISSION §5.3 was measured at the old 15/28 coverage, which it identified as the cap on correctness, so those numbers now understate the system.
 
 Notes for a fresh clone: the DuckDB store (`data/label_lens.duckdb`) and the Chroma index (`data/chroma/`) are local and gitignored, so rebuild them with `build_spine.py` then `load_products.py` then `build_briefs.py` then `build_index.py`. Open Food Facts' API is intermittently flaky (503); the loader uses the reliable category-based query and retries, but a small batch (`load_products.py 100`) is more likely to slip through than 400. The OpenRouter key is in `.env.local` (gitignored, stays on this machine).
 
@@ -27,7 +27,7 @@ Five milestones in dependency order (each one needs the previous). No dates: thi
 
 ### Milestone 1: Data and briefs
 
-**Status: mostly done.** Briefs built (28); 100 US candy products loaded; status coverage 15/28.
+**Status: done.** Briefs built (28); 100 US candy products loaded; status coverage 28/28 (EU + US FDA for every additive, California / IARC where a notable ruling exists).
 
 **Goal:** turn the CAS spine into the knowledge the assistant reasons over.
 
@@ -70,7 +70,7 @@ Five milestones in dependency order (each one needs the previous). No dates: thi
 
 ### Milestone 4: Evaluate, then improve with evidence
 
-**Status: done.** 22-question gold set from the curated status rows; LLM-judge (correctness/groundedness/safety) + RAGAS harness with a recorded baseline; reranker and hybrid before/after tables showing measured Hit@1/MRR gains. Conclusions written in SUBMISSION §5.3. Key finding: retrieval is the bottleneck (high faithfulness, lower recall), and the status-coverage gap caps correctness.
+**Status: done.** 22-question gold set from the curated status rows; LLM-judge (correctness/groundedness/safety) + RAGAS harness with a recorded baseline; reranker and hybrid before/after tables showing measured Hit@1/MRR gains. Conclusions written in SUBMISSION §5.3. Key finding: retrieval is the bottleneck (high faithfulness, lower recall), and the status-coverage gap caps correctness. Note: this baseline was recorded at 15/28 status coverage; that gap has since been closed (see "Where we are"), so a re-run would remeasure correctness against complete data.
 
 **Goal:** the graded evaluation story.
 

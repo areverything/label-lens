@@ -20,7 +20,7 @@ The structured Store and the RAG briefs are both built on one foundation: a cano
 
 1. **Names and codes** come from [Open Food Facts](https://openfoodfacts.org) (a free, crowd-sourced database of packaged foods). Its *additives taxonomy* maps each E-number to a name, a category, and a [Wikidata](https://www.wikidata.org) link.
 2. **CAS numbers** are *not* in Open Food Facts (a discovery: the original plan assumed they were). They come from Wikidata, which stores a CAS number for each chemical. The bridge is therefore `E-number → Wikidata → CAS`. Two additives needed a hand override (documented in `src/label_lens/etl/spine.py`): erythrosine (the disodium salt CAS the FDA uses, not the acid form Wikidata returns) and brominated vegetable oil (a mixture with no single CAS in Wikidata).
-3. **Legal status** per region (EU, US FDA, California, plus the IARC cancer classification) is currently a hand-curated, primary-source-cited set covering the marquee cases; it doubles as the evaluation answer key.
+3. **Legal status** per region (EU, US FDA, California, plus the IARC cancer classification) is a hand-curated, primary-source-cited set. Every in-scope additive has at least an EU and a US FDA row; California and IARC rows are added where a notable ruling or classification exists. It doubles as the evaluation answer key.
 
 Everything lands in one [DuckDB](https://duckdb.org) file (a lightweight local database) with three tables:
 

@@ -190,6 +190,32 @@ def test_many_status_lookups_collapse_into_one_step():
     assert "DuckDB" in g["tech"]["call"]
 
 
+def test_iarc_2a_and_3_render_in_plain_english_apart_from_legal():
+    """The nitrite/BHT rows use IARC Group 2A and Group 3; both must render as
+    plain hazard lines, kept out of the legal-status list and out of divergence."""
+    msgs = [
+        _ai([{"name": "additive_status", "args": {"term": "E250"}, "id": "a"}]),
+        _tool("a", _status("Sodium nitrite (E250, CAS 7632-00-0):",
+                           "- EU: authorised — allowed [Annex II, as of 2023]",
+                           "- US_FDA: permitted — allowed [21 CFR 172.175, as of 2024]",
+                           "- IARC: group_2a — probable [IARC Vol. 94, as of 2010]")),
+        _final("Nitrite is allowed both sides; IARC rates the exposure 2A [cite]."),
+    ]
+    store = summarize_run(msgs, msgs[-1].content)[0]
+    assert "Cancer research (IARC): Rated a probable cause of cancer (IARC Group 2A)" in store["lines"]
+    # Legal status agrees (both allow), so no "different decisions" note despite the hazard line.
+    assert store["note"] == ""
+
+    bht = summarize_run([
+        _ai([{"name": "additive_status", "args": {"term": "E321"}, "id": "b"}]),
+        _tool("b", _status("BHT (E321, CAS 128-37-0):",
+                           "- US_FDA: permitted — GRAS [21 CFR 182.3173, as of 2024]",
+                           "- IARC: group_3 — not classifiable [IARC Vol. 40, as of 1986]")),
+        _final("BHT is GRAS; IARC Group 3 [cite]."),
+    ], "BHT is GRAS; IARC Group 3 [cite].")[0]
+    assert "Cancer research (IARC): Not classifiable as a cancer hazard (IARC Group 3)" in bht["lines"]
+
+
 def test_agreeing_regulators_are_not_flagged_as_divergent():
     """"authorised" (EU) and "permitted" (US) are different codes that both mean
     "Allowed", so an additive both regulators allow must not read as a divergence."""
