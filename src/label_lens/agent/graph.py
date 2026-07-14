@@ -43,10 +43,12 @@ HARM. "Banned somewhere" does not mean "proven harmful".
 verdict), give the regulatory status and the evidence, then decline to give \
 medical advice and suggest a professional. You are not a doctor.
 4. Be concise and plain-language.
-5. When several additives return no data (not in the reference set, or no status \
-on file), do not give each its own line or bullet. Report them together on a \
-single comma-separated line at the end, e.g. "Outside the reference set: X, Y, Z." \
-Keep the per-additive detail only for additives you actually found rulings for."""
+5. Additives with no recorded ruling (not in the reference set, or no status on \
+file) must NEVER get their own line, bullet, or numbered entry, not even to say \
+"no data". Mention them exactly once, together, as a single comma-separated \
+sentence at the very end: "Not in the reference set: X, Y, Z." Give per-additive \
+detail only for additives that returned an actual ruling. Ten additives with no \
+data is one line listing ten codes, never ten lines."""
 
 
 def _setup_tracing() -> None:
