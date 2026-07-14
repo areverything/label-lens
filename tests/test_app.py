@@ -49,6 +49,23 @@ def test_saving_profile_persists_to_memory():
     assert profile["allergies"] == "peanuts"
 
 
+def test_activity_log_hidden_by_default(monkeypatch):
+    """The chat-wide activity log stays off unless SHOW_ACTIVITY_LOG is set."""
+    monkeypatch.delenv("SHOW_ACTIVITY_LOG", raising=False)
+    at = AppTest.from_file(APP).run(timeout=30)
+    assert not at.exception
+    labels = [e.label for e in at.expander]
+    assert not any(l.startswith("Activity log") for l in labels)
+
+
+def test_activity_log_shown_when_flag_set(monkeypatch):
+    monkeypatch.setenv("SHOW_ACTIVITY_LOG", "1")
+    at = AppTest.from_file(APP).run(timeout=30)
+    assert not at.exception
+    labels = [e.label for e in at.expander]
+    assert any(l.startswith("Activity log") for l in labels)
+
+
 def test_chat_input_produces_a_cited_answer():
     at = AppTest.from_file(APP).run(timeout=30)
     at.chat_input[0].set_value("Is E171 banned in the EU?").run(timeout=30)

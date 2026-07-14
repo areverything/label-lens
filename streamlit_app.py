@@ -31,7 +31,8 @@ import streamlit as st
 # Bridge it into the environment the agent reads before importing the agent.
 # Accessing st.secrets with no secrets file raises, so guard it (local dev).
 try:
-    for _k in ("OPENROUTER_API_KEY", "OPENROUTER_MODEL", "LANGSMITH_API_KEY"):
+    for _k in ("OPENROUTER_API_KEY", "OPENROUTER_MODEL", "LANGSMITH_API_KEY",
+               "SHOW_ACTIVITY_LOG"):
         if _k in st.secrets and not os.getenv(_k):
             os.environ[_k] = str(st.secrets[_k])
 except Exception:
@@ -614,13 +615,26 @@ def _record_activity(question: str, trace: list[dict]) -> None:
         {"time": time.strftime("%H:%M:%S"), "question": question, "trace": trace})
 
 
+def _activity_log_enabled() -> bool:
+    """The chat-wide activity log renders only when SHOW_ACTIVITY_LOG is truthy.
+
+    It is a reviewer / debugging aid, not part of the shopper UI, so it stays off
+    by default. Set SHOW_ACTIVITY_LOG=1 (env var locally, or a Streamlit secret in
+    the cloud). The per-answer "How it found this answer" panel is unaffected.
+    """
+    return os.getenv("SHOW_ACTIVITY_LOG", "").strip().lower() in {"1", "true", "yes", "on"}
+
+
 def _footer_log() -> None:
     """The app-wide activity log, at the foot of every tab.
 
     Shows, newest first, what the app did behind the scenes for each question:
     the sources it checked, what it found, and why each step matters. Same trace
-    the per-answer panel shows, accumulated across the session.
+    the per-answer panel shows, accumulated across the session. Gated behind
+    SHOW_ACTIVITY_LOG so it does not show for shoppers by default.
     """
+    if not _activity_log_enabled():
+        return
     log = st.session_state.get("activity_log", [])
     st.divider()
     title = f"Activity log · {len(log)} question{'s' if len(log) != 1 else ''} this session"
