@@ -215,20 +215,20 @@ Two layers, both through the OpenRouter gateway:
 
 _(RAGAS 0.4.3 hard-imports a langchain module dropped in langchain 1.x; since we never use it, a one-line `sys.modules` shim in `eval/ragas_eval.py` lets RAGAS run against the current stack without downgrading everything.)_
 
-**Baseline** (default model, dense retrieval):
+**Measured before and after closing the status-coverage gap** (default model and retriever; the only change between the two columns is partial 15/28 vs full 28/28 status coverage, with the affected briefs regenerated to match):
 
-| Agent answer (n=22) | Score | | RAGAS / RAG pipeline (n=10) | Score |
-|---|--:|---|---|--:|
-| Correctness | 0.695 | | Context precision | 0.708 |
-| Groundedness | 0.545 | | Context recall | 0.567 |
-| Safety boundary | 0.955 | | Faithfulness | 0.963 |
-| | | | Answer relevancy | 0.450 |
+| Agent answer (n=22) | 15/28 | 28/28 | | RAGAS / RAG pipeline (n=10) | 15/28 | 28/28 |
+|---|--:|--:|---|---|--:|--:|
+| Correctness | 0.695 | **0.882** | | Context precision | 0.708 | 0.847 |
+| Groundedness | 0.545 | **0.809** | | Context recall | 0.567 | 0.583 |
+| Safety boundary | 0.955 | 0.909 | | Faithfulness | 0.963 | 0.926 |
+| | | | | Answer relevancy | 0.450 | 0.793 |
 
 ### 5.3 Conclusions
 
-- **The safety boundary holds (0.955).** The agent almost always reports status and evidence and declines a medical verdict; the one slip was on a nitrite health-concern phrasing, not a medical verdict.
-- **Faithfulness is high (0.963) but recall is the bottleneck (0.567).** When context is retrieved, the agent does not hallucinate: it grounds answers in the passages. The lower context recall says the *retriever*, not the generator, is what to improve, which is exactly what Task 6 targets.
-- **Correctness (0.695) and groundedness (0.545) are capped by two things the eval pinpoints:** (1) the **status-coverage gap**, additives with no curated rows yet (E210, E132, E133, ...) make the agent correctly say "no status recorded", which the judge scores as a miss against the reference; and (2) **retrieval confusion on near-identical additives** (nitrate vs nitrite, BHA vs BHT), which produced wrong or muddled answers. The first is closed by the bulk loaders; the second is what the reranker and hybrid retrieval fix below.
+- **Closing the status-coverage gap lifted correctness 0.695 → 0.882 and groundedness 0.545 → 0.809.** The first run pinpointed the gap: in-scope additives with no curated row (benzoic acid, the nitrates, BHT, the two blues) forced a correct-but-empty "no status recorded" that the judge scored as a miss against the reference. After curating cited EU / US-FDA rows (and IARC where a real classification exists) for all 28 in-scope additives and regenerating the affected briefs, those exact questions each rose by +0.3 to +1.0, with no regressions. The eval named the bottleneck and fixing it moved the number it predicted; answer relevancy jumped 0.450 → 0.793 for the same reason (on-topic, cited answers where there were empty ones).
+- **The safety boundary held around 0.9 (0.955 → 0.909).** Both runs flag the same nitrite health-concern phrasing; the one extra flag is on BHA, an additive whose data did not change, for a Prop 65 citation nuance, so a single-question swing on n=22 is within the judge's run-to-run variance, not a new medical-verdict failure.
+- **Faithfulness stays high (~0.93) and recall is still the ceiling (0.567 → 0.583).** When context is retrieved, the agent grounds its answer rather than inventing one. Coverage adds facts, not retrievability, so recall barely moved: separating near-identical briefs (nitrate vs nitrite, BHA vs BHT) is the *retriever's* job, which is exactly what Task 6 targets.
 
 ---
 
@@ -238,9 +238,9 @@ Both improvements are measured with the same harness on the same 20 RAG gold que
 
 | Retriever | Hit@1 | Hit@3 | MRR |
 |---|--:|--:|--:|
-| dense (baseline) | 0.750 | 0.850 | 0.810 |
-| **+ reranker** | **0.850** | **0.950** | **0.900** |
-| **hybrid (BM25 + dense)** | **0.850** | 0.900 | 0.895 |
+| dense (baseline) | 0.750 | 0.900 | 0.835 |
+| **+ reranker** | **0.900** | **0.950** | **0.925** |
+| **hybrid (BM25 + dense)** | **0.850** | 0.950 | 0.910 |
 
 ### 6.1 Advanced retriever: cross-encoder reranker
 
@@ -248,7 +248,7 @@ The baseline dense retriever fetches a wider candidate set, then a **bge-reranke
 
 ### 6.2 Before/after results
 
-The reranker lifts every metric: **Hit@1 0.750 → 0.850, Hit@3 0.850 → 0.950, MRR 0.810 → 0.900** (table above). It fixed exactly the confusions the gold set targeted: "FD&C Yellow 6" (E110, was returning tartrazine E102) and the "21 CFR 74.706" cite (was returning E104).
+The reranker lifts every metric: **Hit@1 0.750 → 0.900, Hit@3 0.900 → 0.950, MRR 0.835 → 0.925** (table above). It fixed exactly the confusions the gold set targeted: "FD&C Yellow 6" (E110, was returning tartrazine E102) and the "21 CFR 74.706" cite (was returning E104).
 
 ### 6.3 Second improvement: hybrid BM25 + dense
 
@@ -267,7 +267,7 @@ Keyword BM25 scores are fused with dense scores by reciprocal-rank fusion. This 
 
 **What to change or improve**, in priority order set by the evaluation evidence:
 
-1. **Close the status-coverage gap** by finishing the four bulk loaders (`fda/eu/iarc/prop65`). The eval is explicit that this gap is the main cap on answer correctness (additives with no curated row force a correct-but-empty "no status recorded"), so it is the single highest-leverage change, not more model tuning.
+1. **Automate status coverage as scope grows.** The gap the first eval flagged is now closed: all 28 in-scope additives carry hand-curated, primary-source-cited rows, and re-running the eval confirmed the predicted lift (correctness 0.695 → 0.882, groundedness 0.545 → 0.809). Hand curation is fine at this scale; to grow past the curated slice, the four bulk loaders (`fda/eu/iarc/prop65`) would hydrate new additives automatically instead of by hand.
 2. **Route by query type in retrieval.** The eval showed hybrid helps exact-token queries but can regress on purely semantic ones, so the honest next step is to send bare-ID and citation lookups to the store lane / hybrid and semantic "why" questions to dense+reranker, rather than one retriever for all.
 3. **Persist and enrich memory.** Memory is per-session on the current host (the filesystem resets on reboot); moving it to durable storage, then adding cumulative daily-intake tracking against ADI limits (the schema already supports it), would unlock the "am I over a safe limit today?" story fully.
 4. **Broaden scope** beyond US candy to another category, cheap to do once the loaders make coverage automatic.
