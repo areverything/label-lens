@@ -85,7 +85,13 @@ div[class*="_rm_"] button:hover { background-color:#c94444 !important; border-co
 .st-key-ll_header [data-testid="stMarkdownContainer"] {
   height: 100%; display: flex; align-items: center; width: 100%;
 }
-.st-key-ll_header .stMarkdown p { margin: 0; line-height: 1; }
+/* Make the logo's paragraph its own full-height flex box so the name+icon are
+   centred on the bar's centre line, not left sitting on the text baseline (the
+   emoji's ascent/descent otherwise drags the whole logo below the tabs). */
+.st-key-ll_header .stMarkdown p {
+  margin: 0; line-height: 1;
+  height: 100%; display: flex; align-items: center;
+}
 
 /* Tabs = plain clickable text: strip the segmented-control button borders/pills
    and show selection by colour only (bright+bold = selected, muted = not). */
@@ -146,6 +152,7 @@ div[class*="_add_"] button, div[class*="_rm_"] button { white-space: nowrap !imp
   .st-key-ll_header [data-testid="stMarkdown"],
   .st-key-ll_header [data-testid="stMarkdown"] > div,
   .st-key-ll_header [data-testid="stMarkdownContainer"] { height: auto !important; }
+  .st-key-ll_header .stMarkdown p { height: auto !important; }
   /* Drop the desktop right-hand spacer column (it reserved room for Streamlit's
      Share button, which collapses to a compact menu on phones) and centre the
      tab row under the logo. */
