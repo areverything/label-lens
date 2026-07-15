@@ -2,9 +2,8 @@
 
 Runs in a phone or laptop browser. Ask about an additive or a product; the agent
 routes to the Store (legal status), RAG (evidence), or a live government API and
-answers with citations. Three tabs in the header: Chat, Pantry (browse products
-and build a pantry), and Profile (diet/allergies). The sidebar shows a read-only
-summary of the profile and pantry.
+answers with citations. Two tabs in the header: Chat and Pantry (browse products
+and build a pantry). The sidebar shows a read-only summary of the pantry.
 
 Entry point for Streamlit Community Cloud (auto-detected at the repo root).
 """
@@ -280,16 +279,9 @@ def _password_ok() -> bool:
 
 
 def sidebar_summary() -> None:
-    """Read-only summary of the profile and pantry. Editing lives in the tabs."""
+    """Read-only summary of the pantry. Editing lives in the Pantry tab."""
     con, uid = _con(), _user_id()
     with st.sidebar:
-        st.subheader("Your profile")
-        prof = memory.get_profile(con, uid) or {"diet": "", "allergies": ""}
-        if prof["diet"] or prof["allergies"]:
-            st.caption(f"**Diet:** {prof['diet'] or '—'}  \n**Allergies:** {prof['allergies'] or '—'}")
-        else:
-            st.caption("Not set yet. Add it in the **Profile** tab.")
-
         pantry = memory.get_log_with_additives(con, uid)
         st.subheader(f"Your pantry ({len(pantry)})")
         if not pantry:
@@ -319,8 +311,6 @@ def main() -> None:
     view = _header()
     if view == "🧺 Pantry":
         render_pantry()
-    elif view == "👤 Profile":
-        render_profile()
     else:
         render_chat()
     _footer_log()
@@ -343,23 +333,9 @@ def _header() -> str:
                 "Label Lens</span>", unsafe_allow_html=True)
         with mid:
             view = st.segmented_control(
-                "view", ["💬 Chat", "🧺 Pantry", "👤 Profile"], default="💬 Chat",
+                "view", ["💬 Chat", "🧺 Pantry"], default="💬 Chat",
                 key="view", label_visibility="collapsed")
     return view or "💬 Chat"
-
-
-def render_profile() -> None:
-    _scroll_to_top()
-    con, uid = _con(), _user_id()
-    st.subheader("👤 Your profile")
-    st.caption("The agent reads this to personalise answers. It still cites every fact.")
-    profile = memory.get_profile(con, uid) or {"diet": "", "allergies": ""}
-    with st.form("profile"):
-        diet = st.text_input("Diet", value=profile["diet"], placeholder="e.g. vegetarian")
-        allergies = st.text_input("Allergies", value=profile["allergies"], placeholder="e.g. peanuts")
-        if st.form_submit_button("Save profile"):
-            memory.set_profile(con, uid, diet=diet, allergies=allergies)
-            st.success("Saved.")
 
 
 def render_chat() -> None:

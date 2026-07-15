@@ -1,12 +1,12 @@
-"""User memory: a diet/allergy profile and a product log, round-tripped in DuckDB."""
+"""User memory: an append-only product log (the pantry), round-tripped in DuckDB."""
 from __future__ import annotations
 
 import duckdb
 import pytest
 
 from label_lens.agent.memory import (
-    ensure_memory_tables, get_log, get_log_with_additives, get_profile,
-    log_product, remove_product, set_profile,
+    ensure_memory_tables, get_log, get_log_with_additives,
+    log_product, remove_product,
 )
 
 
@@ -16,24 +16,6 @@ def con():
     ensure_memory_tables(c)
     yield c
     c.close()
-
-
-def test_profile_round_trips(con):
-    set_profile(con, "u1", diet="vegetarian", allergies="peanuts")
-    p = get_profile(con, "u1")
-    assert p["diet"] == "vegetarian"
-    assert p["allergies"] == "peanuts"
-
-
-def test_set_profile_upserts(con):
-    set_profile(con, "u1", diet="vegan", allergies="")
-    set_profile(con, "u1", diet="vegan", allergies="soy")
-    p = get_profile(con, "u1")
-    assert p["allergies"] == "soy"  # updated, not duplicated
-
-
-def test_missing_profile_is_none(con):
-    assert get_profile(con, "nobody") is None
 
 
 def test_product_log_accumulates_in_order(con):

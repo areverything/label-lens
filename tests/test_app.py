@@ -1,4 +1,4 @@
-"""Drive the Streamlit UI headlessly with AppTest: profile, product log, chat.
+"""Drive the Streamlit UI headlessly with AppTest: product log and chat.
 
 The agent's answer() is stubbed so these tests exercise the UI wiring (widgets,
 memory writes, chat rendering) without a live LLM call.
@@ -27,26 +27,6 @@ def test_app_renders_title_and_examples():
     assert not at.exception
     assert any("Label Lens" in md.value for md in at.markdown)  # header logo
     assert len(at.button) >= 4  # the example-question buttons
-
-
-def test_saving_profile_persists_to_memory():
-    at = AppTest.from_file(APP)
-    at.session_state["view"] = "👤 Profile"  # the profile form lives in the Profile tab
-    at.run(timeout=30)
-    # Fill the profile form and submit (form-submit buttons live in at.button).
-    at.text_input[0].set_value("vegetarian")
-    at.text_input[1].set_value("peanuts")
-    save = next(b for b in at.button if b.label == "Save profile")
-    save.click().run(timeout=30)
-    assert not at.exception
-
-    # The same session id should now read back the saved profile.
-    from label_lens.agent import memory
-    from label_lens.agent.tools import _con
-    uid = at.session_state["user_id"]
-    profile = memory.get_profile(_con(), uid)
-    assert profile["diet"] == "vegetarian"
-    assert profile["allergies"] == "peanuts"
 
 
 def test_activity_log_hidden_by_default(monkeypatch):
@@ -142,7 +122,7 @@ def test_clicking_a_product_name_opens_details_without_error():
 
 def _chips(at):
     """The suggestion-chip labels (excluding the sidebar and login buttons)."""
-    other = {"Save profile", "Log product", "Enter"}
+    other = {"Log product", "Enter"}
     return [b.label for b in at.button if b.label not in other]
 
 

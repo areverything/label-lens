@@ -71,16 +71,13 @@ def _model() -> ChatOpenAI:
 
 def _memory_block(user_id: str) -> str:
     con = _con()
-    profile = memory.get_profile(con, user_id)
     log = memory.get_log_with_additives(con, user_id)
-    if not profile and not log:
+    if not log:
         return ""
-    parts = ["\n\nUser memory (use it to personalise, still cite facts). The "
-             "additives below are from the store, not a guess: treat them as the "
-             "authoritative ingredient list and do not invent others."]
-    if profile:
-        parts.append(f"- Profile: diet={profile['diet'] or 'none'}, "
-                     f"allergies={profile['allergies'] or 'none'}")
+    parts = ["\n\nUser pantry (products the user logged; answer cumulative "
+             "questions from it). The additives below are from the store, not a "
+             "guess: treat them as the authoritative ingredient list and do not "
+             "invent others."]
     for r in log:
         # Strip the "en:" tag prefix to the bare E-numbers for the model.
         codes = ", ".join(t.split(":")[-1].upper() for t in r["additives"].split(",") if t)

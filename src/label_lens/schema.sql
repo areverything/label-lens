@@ -47,15 +47,9 @@ CREATE TABLE IF NOT EXISTS product (
     -- survive a redeploy; a committed text sidecar always does.
 );
 
--- User memory: one diet/allergy profile row per user, plus an append-only log of
--- products they asked about. Powers cumulative, personalised questions. Also
--- created on demand by agent/memory.py so an existing store gains them in place.
-CREATE TABLE IF NOT EXISTS user_profile (
-    user_id    TEXT PRIMARY KEY,
-    diet       TEXT,
-    allergies  TEXT,
-    updated_at TEXT
-);
+-- User memory: an append-only log of products the user asked about (the pantry).
+-- Powers cumulative questions. Also created on demand by agent/memory.py so an
+-- existing store gains it in place.
 CREATE SEQUENCE IF NOT EXISTS product_log_seq START 1;
 CREATE TABLE IF NOT EXISTS product_log (
     id        BIGINT DEFAULT nextval('product_log_seq') PRIMARY KEY,
