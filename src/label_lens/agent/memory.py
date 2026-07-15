@@ -85,14 +85,13 @@ def get_log_with_additives(con: duckdb.DuckDBPyConnection, user_id: str) -> list
 
     Grounds cumulative questions: the additive list comes from the store, not the
     model's guess. `additives` is the comma-joined en:e### tags, empty if the
-    barcode is not in the product table. `ingredients` is the product's ingredient
-    text, used to match the profile's allergies against a real ingredient list.
+    barcode is not in the product table.
     """
     return [
-        {"barcode": b, "name": n, "additives": tags or "", "ingredients": ing or ""}
-        for b, n, tags, ing in con.execute(
+        {"barcode": b, "name": n, "additives": tags or ""}
+        for b, n, tags in con.execute(
             """SELECT pl.barcode, COALESCE(NULLIF(pl.name, ''), p.name),
-                      p.additives_tags, p.ingredients_text
+                      p.additives_tags
                FROM product_log pl
                LEFT JOIN product p ON pl.barcode = p.barcode
                WHERE pl.user_id = ? ORDER BY pl.id""", [user_id]).fetchall()

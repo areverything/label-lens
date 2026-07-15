@@ -57,14 +57,10 @@ def test_remove_product_takes_it_out_of_the_pantry(con):
 
 
 def test_log_with_additives_joins_real_product_tags(con):
-    con.execute("CREATE TABLE product "
-                "(barcode TEXT, name TEXT, additives_tags TEXT, ingredients_text TEXT)")
-    con.execute("INSERT INTO product VALUES "
-                "('999', 'Skittles', 'en:e102,en:e171', 'sugar, corn syrup, e102')")
+    con.execute("CREATE TABLE product (barcode TEXT, name TEXT, additives_tags TEXT)")
+    con.execute("INSERT INTO product VALUES ('999', 'Skittles', 'en:e102,en:e171')")
     log_product(con, "u1", barcode="999", name="Skittles")
     log_product(con, "u1", barcode="000", name="Unknown Bar")  # not in product table
     rows = get_log_with_additives(con, "u1")
     assert rows[0]["additives"] == "en:e102,en:e171"
-    assert rows[0]["ingredients"] == "sugar, corn syrup, e102"
     assert rows[1]["additives"] == ""  # unmatched barcode -> empty, not fabricated
-    assert rows[1]["ingredients"] == ""  # unmatched barcode -> empty, not fabricated
