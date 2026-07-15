@@ -48,7 +48,11 @@ file) must NEVER get their own line, bullet, or numbered entry, not even to say 
 "no data". Mention them exactly once, together, as a single comma-separated \
 sentence at the very end: "Not in the reference set: X, Y, Z." Give per-additive \
 detail only for additives that returned an actual ruling. Ten additives with no \
-data is one line listing ten codes, never ten lines."""
+data is one line listing ten codes, never ten lines.
+6. Allergens: if the user memory carries an ALLERGEN ALERT for a logged product, \
+open your answer by naming that product and the allergen it contains, since it is \
+on the user's allergy list. This is an ingredient fact from the label, not a \
+health verdict, so state it plainly and still keep the rule 3 boundary."""
 
 
 def _setup_tracing() -> None:
@@ -78,14 +82,21 @@ def _memory_block(user_id: str) -> str:
     parts = ["\n\nUser memory (use it to personalise, still cite facts). The "
              "additives below are from the store, not a guess: treat them as the "
              "authoritative ingredient list and do not invent others."]
+    allergens = []
     if profile:
         parts.append(f"- Profile: diet={profile['diet'] or 'none'}, "
                      f"allergies={profile['allergies'] or 'none'}")
+        allergens = [a.strip().lower() for a in (profile["allergies"] or "").split(",") if a.strip()]
     for r in log:
         # Strip the "en:" tag prefix to the bare E-numbers for the model.
         codes = ", ".join(t.split(":")[-1].upper() for t in r["additives"].split(",") if t)
         line = f"- Logged: {r['name'] or r['barcode']}"
         line += f" — additives: {codes}" if codes else " — additives: (not on file)"
+        # Match the profile's allergies against the real ingredient list.
+        ing = r["ingredients"].lower()
+        hits = [a for a in allergens if a and a in ing]
+        if hits:
+            line += f" — ALLERGEN ALERT: ingredients list {', '.join(hits)}, on the user's allergy list"
         parts.append(line)
     return "\n".join(parts)
 
