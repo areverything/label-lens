@@ -76,21 +76,24 @@ div[class*="_rm_"] button:hover { background-color:#c94444 !important; border-co
 /* Full-height flex-centering down the whole nesting so the logo, tabs and the
    Share buttons all land on the same vertical centre line. */
 .st-key-ll_header > div,
+.st-key-ll_header [data-testid="stLayoutWrapper"],
+.st-key-ll_header [data-testid="stVerticalBlock"],
 .st-key-ll_header [data-testid="stHorizontalBlock"],
 .st-key-ll_header [data-testid="stColumn"],
 .st-key-ll_header [data-testid="stElementContainer"],
 .st-key-ll_header [data-testid="stButtonGroup"],
 .st-key-ll_header [data-testid="stMarkdown"],
-.st-key-ll_header [data-testid="stMarkdown"] > div,
-.st-key-ll_header [data-testid="stMarkdownContainer"] {
+.st-key-ll_header [data-testid="stMarkdown"] > div {
   height: 100%; display: flex; align-items: center; width: 100%;
 }
-/* Make the logo's paragraph its own full-height flex box so the name+icon are
-   centred on the bar's centre line, not left sitting on the text baseline (the
-   emoji's ascent/descent otherwise drags the whole logo below the tabs). */
+/* Stop the chain at the markdown container: force it (and the paragraph) to full
+   height and Streamlit's own container style offsets it ~9px, pushing the logo
+   below the bar's centre line. Instead let the container/paragraph shrink to the
+   logo's content and be centred by the full-height flex parents above. */
+.st-key-ll_header [data-testid="stMarkdownContainer"],
 .st-key-ll_header .stMarkdown p {
-  margin: 0; line-height: 1;
-  height: 100%; display: flex; align-items: center;
+  height: auto; margin: 0; line-height: 1;
+  display: flex; align-items: center;
 }
 
 /* Tabs = plain clickable text: strip the segmented-control button borders/pills
@@ -151,7 +154,9 @@ div[class*="_add_"] button, div[class*="_rm_"] button { white-space: nowrap !imp
   .st-key-ll_header [data-testid="stButtonGroup"],
   .st-key-ll_header [data-testid="stMarkdown"],
   .st-key-ll_header [data-testid="stMarkdown"] > div,
-  .st-key-ll_header [data-testid="stMarkdownContainer"] { height: auto !important; }
+  .st-key-ll_header [data-testid="stMarkdownContainer"],
+  .st-key-ll_header [data-testid="stLayoutWrapper"],
+  .st-key-ll_header [data-testid="stVerticalBlock"] { height: auto !important; }
   .st-key-ll_header .stMarkdown p { height: auto !important; }
   /* Drop the desktop right-hand spacer column (it reserved room for Streamlit's
      Share button, which collapses to a compact menu on phones) and centre the
