@@ -8,16 +8,15 @@ Where the project stands and what's built next, in dependency order. For *how an
 
 **Status coverage:** every in-scope additive (28/28) now has EU and US FDA regulatory-status rows, plus California / IARC rows where a notable ruling or classification exists. Each was primary-source-verified (21 CFR sections against eCFR / Cornell LII, EU rulings against EUR-Lex, IARC groups against the named monographs). The affected briefs were regenerated so the RAG corpus matches the store. Caveat: the recorded eval baseline predates this fill (see Milestone 4).
 
-**Also built:** the **evaluation harness** (Milestone 4). A 22-question gold set (`evals/gold.jsonl`), an LLM-judge (correctness / groundedness / safety), RAGAS (context precision/recall, faithfulness, answer relevancy), and a retrieval before/after comparison. Baseline recorded in `evals/results.json`; the reranker lifts Hit@1 0.75 → 0.85 and MRR 0.81 → 0.90, hybrid BM25+dense also lifts Hit@1 to 0.85. Tasks 5 and 6 answered with numbers in SUBMISSION.
+**Also built:** the **evaluation harness** (Milestone 4). A 22-question gold set (`evals/gold.jsonl`), an LLM-judge (correctness / groundedness / safety), RAGAS (context precision/recall, faithfulness, answer relevancy), and a retrieval before/after comparison. Baseline recorded in `evals/results.json`; the reranker lifts Hit@1 0.75 → 0.85 and MRR 0.81 → 0.90, hybrid BM25+dense also lifts Hit@1 to 0.85. Tasks 5 and 6 answered with numbers in deliverables.
 
 **Deployed:** live and public at https://label-lens.streamlit.app/ (Streamlit Community Cloud), password-gated to protect the LLM key, opens on phone and laptop. Task 7 reflection written. The repo is public.
 
-**Only remaining:** the ≤10-minute Loom demo video (then paste its link at the top of SUBMISSION.md).
+**All deliverables complete**, including the ≤10-minute Loom demo (linked at the top of [deliverables.md](./docs/deliverables.md)).
 
-### Next session: start here
+### Status: complete
 
-1. **Record the Loom demo** (≤10 min): describe the use case, then a live walk-through including one live tool call (the recall / Federal Register lane). Paste the link into the top of [SUBMISSION.md](./docs/SUBMISSION.md) and check the final row.
-2. Re-run the eval (`evals/`) to remeasure correctness now that status coverage is complete. The recorded baseline in `evals/results.json` and SUBMISSION §5.3 was measured at the old 15/28 coverage, which it identified as the cap on correctness, so those numbers now understate the system.
+Every rubric deliverable is done. The Loom demo is recorded and linked at the top of [deliverables.md](./docs/deliverables.md), and the eval was re-run at full 28/28 status coverage (`evals/results.json`, written up in deliverables §5-6).
 
 Notes for a fresh clone: the DuckDB store (`data/label_lens.duckdb`) and the Chroma index (`data/chroma/`) are local and gitignored, so rebuild them with `build_spine.py` then `load_products.py` then `build_briefs.py` then `build_index.py`. Open Food Facts' API is intermittently flaky (503); the loader uses the reliable category-based query and retries, but a small batch (`load_products.py 100`) is more likely to slip through than 400. The OpenRouter key is in `.env.local` (gitignored, stays on this machine).
 
@@ -52,7 +51,7 @@ Five milestones in dependency order (each one needs the previous). No dates: thi
 
 **Produces:** a local agent that answers the six evaluation question types with cited answers.
 **Closes:** Task 4 deliverable 1 (end-to-end prototype); the Task 2 requirements (gateway, memory, tools).
-**Done when:** each of the six sample questions in [SUBMISSION §1.4](./docs/SUBMISSION.md#14-questions-we-evaluate-against) returns a cited answer locally, visible as a trace in LangSmith.
+**Done when:** each of the six sample questions in [deliverables §1.4](./docs/deliverables.md#14-questions-we-evaluate-against) returns a cited answer locally, visible as a trace in LangSmith.
 
 ### Milestone 3: The app, in a browser, public
 
@@ -70,7 +69,7 @@ Five milestones in dependency order (each one needs the previous). No dates: thi
 
 ### Milestone 4: Evaluate, then improve with evidence
 
-**Status: done.** 22-question gold set from the curated status rows; LLM-judge (correctness/groundedness/safety) + RAGAS harness with a recorded baseline; reranker and hybrid before/after tables showing measured Hit@1/MRR gains. Conclusions written in SUBMISSION §5.3. Key finding: retrieval is the bottleneck (high faithfulness, lower recall), and the status-coverage gap caps correctness. Note: this baseline was recorded at 15/28 status coverage; that gap has since been closed (see "Where we are"), so a re-run would remeasure correctness against complete data.
+**Status: done.** 22-question gold set from the curated status rows; LLM-judge (correctness/groundedness/safety) + RAGAS harness with a recorded baseline; reranker and hybrid before/after tables showing measured Hit@1/MRR gains. Conclusions written in deliverables §5.3. Key finding: retrieval is the bottleneck (high faithfulness, lower recall), and the status-coverage gap caps correctness. Note: this baseline was recorded at 15/28 status coverage; that gap has since been closed (see "Where we are"), so a re-run would remeasure correctness against complete data.
 
 **Goal:** the graded evaluation story.
 
@@ -88,10 +87,10 @@ Five milestones in dependency order (each one needs the previous). No dates: thi
 **Goal:** a submission a reviewer can check in minutes.
 
 - Write the Task 7 reflection (what to keep and what to change for Demo Day).
-- Fill in `docs/SUBMISSION.md` end to end; confirm every coverage-checklist row is green.
+- Fill in `docs/deliverables.md` end to end; confirm every coverage-checklist row is green.
 - Record the 10-minutes-or-less Loom demo showing a live tool call and describing the use case.
 - Final repo tidy; confirm it is public.
 
 **Produces:** the complete submission (public repo, video, written document).
 **Closes:** Task 7 and the final-submission requirements.
-**Done when:** the coverage checklist is all `✅` and the video and repo links are in place at the top of `docs/SUBMISSION.md`.
+**Done when:** the coverage checklist is all `✅` and the video and repo links are in place at the top of `docs/deliverables.md`.

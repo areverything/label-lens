@@ -3,14 +3,40 @@
 This document is the write-up: it answers **every deliverable and question** in the Certification Challenge, one section per task. Coverage, points, and per-deliverable status are tracked in [`RUBRIC.md`](./RUBRIC.md#coverage-checklist); design rationale is in [`TECH_DESIGN.md`](./TECH_DESIGN.md).
 
 - **Live demo (public endpoint):** https://label-lens.streamlit.app/ (password-protected to prevent abuse of the LLM key; the password is provided with the submission, and the app opens on phone and laptop).
-- **Demo video (≤10 min):** _TODO: Loom link_
+- **Demo video (≤10 min):** https://www.loom.com/share/ae708add14fe468abc63aa5c61aebbee
 - **Code:** this repository.
+
+## Deliverable-to-code map
+
+Where each graded deliverable is realised in the code (paths relative to the repo root). The task sections below hold the prose answers; this table is the direct "deliverable → exact code" index.
+
+| Rubric deliverable | Code / artifact |
+|---|---|
+| 1 · Eval questions (input-output pairs) | `evals/gold.jsonl` (loaded by `src/label_lens/eval/gold.py`) |
+| 2 · LLM gateway | `src/label_lens/llm.py` |
+| 2 · Agent orchestration | `src/label_lens/agent/graph.py` |
+| 2 · Tools (the three lanes) | `src/label_lens/agent/tools.py` → Store `agent/store.py`, RAG `rag/retrieve.py`, Live `agent/live.py` |
+| 2 · Embeddings + vector store | `src/label_lens/rag/embed.py`, `rag/index.py` (Chroma) |
+| 2 · Structured store (DuckDB) | `src/label_lens/db.py`, built store `data/label_lens.duckdb` |
+| 2 · UI + public deploy | `streamlit_app.py` |
+| 2 · Agent-workflow (runtime) | `src/label_lens/agent/graph.py`, step trace `src/label_lens/agent/trace.py` |
+| 3 · Data sources + external APIs | ETL loaders `src/label_lens/etl/` (`off_taxonomy`, `off_products`, `wikidata`, `spine`, `eu`, `fda`, `iarc`, `prop65`, `regulatory_seed`); live APIs `src/label_lens/agent/live.py` |
+| 3 · Chunking strategy | `src/label_lens/rag/chunk.py`; brief assembly `src/label_lens/briefs/` |
+| 4 · End-to-end prototype | `scripts/ask.py` → `src/label_lens/agent/graph.py` + `agent/tools.py` |
+| 4 · Public deployment / front end | `streamlit_app.py` (live at the URL above) |
+| 5 · Test dataset | `evals/gold.jsonl` |
+| 5 · Eval harness | retrieval metrics `src/label_lens/eval/metrics.py` + retrievers `eval/retrievers.py` (run `scripts/eval_retrieval.py`); answer judge `eval/judge.py` (run `scripts/eval_answers.py`); RAGAS `eval/ragas_eval.py`; runner `eval/run.py`; results `evals/results.json` |
+| 6 · Advanced retriever (cross-encoder reranker) | `src/label_lens/eval/retrievers.py` → `rerank()` |
+| 6 · Second improvement (hybrid BM25 + dense) | `src/label_lens/eval/retrievers.py` → `hybrid()` |
+| 6 · Before/after tables | `scripts/eval_retrieval.py`, `evals/results.json` |
+| Memory component (cross-cutting) | `src/label_lens/agent/memory.py` (the pantry product log) |
+| Final · All relevant code | this repository |
 
 ## Task 1: Problem, Audience, and Scope
 
 ### 1.1 The problem (one sentence)
 
-_Draft:_ Shoppers cannot tell, at the shelf, whether the additives in a packaged food are treated as unsafe by regulators elsewhere or what the scientific evidence about them actually says.
+Shoppers cannot tell, at the shelf, whether the additives in a packaged food are treated as unsafe by regulators elsewhere or what the scientific evidence about them actually says.
 
 ### 1.2 Why this is a problem
 
@@ -86,7 +112,7 @@ flowchart LR
     U[User in phone/laptop browser] --> UI[Streamlit chat UI]
     UI --> AG[LangGraph agent]
     AG -->|model calls| GW[OpenRouter gateway to LLM]
-    AG -->|status lookup| DB[(DuckDB<br/>additives + status + memory)]
+    AG -->|status lookup| DB[(DuckDB<br/>additives + status + pantry log)]
     AG -->|retrieve briefs| VDB[(Chroma vector DB)]
     EMB[bge-small embeddings<br/>local ONNX] --- VDB
     AG -->|recalls| FDA[[openFDA API]]
@@ -105,7 +131,7 @@ flowchart LR
 
 ```mermaid
 flowchart TD
-    IN[User question + product] --> MEM[Read memory:<br/>diet/allergy profile + logged products]
+    IN[User question + product] --> MEM[Read memory:<br/>logged pantry products]
     MEM --> ROUTE{Agent decides the lane}
     ROUTE -->|legal fact| STORE[Store tool:<br/>query DuckDB status table]
     ROUTE -->|why / evidence| RAG[RAG tool:<br/>retrieve brief passages]
@@ -119,12 +145,12 @@ flowchart TD
     REFUSE --> OUT
 ```
 
-**Workflow in words:** The user asks about a product or one of its additives. The agent first reads the user's saved memory (diet/allergy profile and previously logged products) so it can personalise and answer cumulative questions. It then routes: a legal-status question goes to the **Store** tool (a direct database query); a "why / is it dangerous" question triggers **RAG** over the per-additive briefs; a "recalled / recent action" question calls a **Live** government API. The agent composes a single answer with citations, deliberately keeping legal status, hazard classification, and personal harm distinct. If the user asks for a health verdict, it returns the facts and evidence but refuses medical advice. There is no human-approval step; the safety boundary is enforced in the routing and the prompt.
+**Workflow in words:** The user asks about a product or one of its additives. The agent first reads the user's saved memory (the products they have logged, the pantry) so it can answer cumulative questions. It then routes: a legal-status question goes to the **Store** tool (a direct database query); a "why / is it dangerous" question triggers **RAG** over the per-additive briefs; a "recalled / recent action" question calls a **Live** government API. The agent composes a single answer with citations, deliberately keeping legal status, hazard classification, and personal harm distinct. If the user asks for a health verdict, it returns the facts and evidence but refuses medical advice. There is no human-approval step; the safety boundary is enforced in the routing and the prompt.
 
 ### 2.4 Required capabilities
 
 - **LLM gateway:** OpenRouter (all model calls routed through it).
-- **Memory:** a per-user diet/allergy profile and a log of asked-about products, stored in DuckDB, enabling cumulative multi-step questions.
+- **Memory:** a log of the products the user has asked about (the pantry), stored in DuckDB, enabling cumulative multi-step questions.
 - **Runs on phone and laptop in a browser:** Streamlit UI served from a public Streamlit Community Cloud URL.
 
 ---
@@ -174,7 +200,7 @@ The agent is a LangGraph ReAct loop over four tools, one per lane ([`agent/tools
 - **check_recalls** — live openFDA food-enforcement call (Live).
 - **recent_regulatory_actions** — live Federal Register call (Live).
 
-Before routing, it reads the user's memory (diet/allergy profile + logged products) and folds the logged products' *real* additives, joined from the `product` table, into the prompt, so cumulative questions are grounded in the store rather than guessed. Every model call goes through the OpenRouter gateway; the safety boundary (legal ≠ hazard ≠ harm, no medical verdict) is enforced in the system prompt. All six evaluation question types in [§1.4](#14-questions-we-evaluate-against) return cited answers; runs are traced in LangSmith when a key is set.
+Before routing, it reads the user's memory (the logged products, the pantry) and folds those products' *real* additives, joined from the `product` table, into the prompt, so cumulative questions are grounded in the store rather than guessed. Every model call goes through the OpenRouter gateway; the safety boundary (legal ≠ hazard ≠ harm, no medical verdict) is enforced in the system prompt. All six evaluation question types in [§1.4](#14-questions-we-evaluate-against) return cited answers; runs are traced in LangSmith when a key is set.
 
 ### 4.2 Public deployment
 
@@ -269,7 +295,7 @@ Keyword BM25 scores are fused with dense scores by reciprocal-rank fusion. This 
 
 1. **Automate status coverage as scope grows.** The gap the first eval flagged is now closed: all 28 in-scope additives carry hand-curated, primary-source-cited rows, and re-running the eval confirmed the predicted lift (correctness 0.695 → 0.882, groundedness 0.545 → 0.809). Hand curation is fine at this scale; to grow past the curated slice, the four bulk loaders (`fda/eu/iarc/prop65`) would hydrate new additives automatically instead of by hand.
 2. **Route by query type in retrieval.** The eval showed hybrid helps exact-token queries but can regress on purely semantic ones, so the honest next step is to send bare-ID and citation lookups to the store lane / hybrid and semantic "why" questions to dense+reranker, rather than one retriever for all.
-3. **Persist and enrich memory.** Memory is per-session on the current host (the filesystem resets on reboot); moving it to durable storage, then adding cumulative daily-intake tracking against ADI limits (the schema already supports it), would unlock the "am I over a safe limit today?" story fully.
+3. **Persist and enrich memory.** The pantry log is per-session on the current host (the filesystem resets on reboot); moving it to durable storage, then adding cumulative daily-intake tracking against ADI limits, would unlock the "am I over a safe limit today?" story fully.
 4. **Broaden scope** beyond US candy to another category, cheap to do once the loaders make coverage automatic.
 
 ---
@@ -278,5 +304,5 @@ Keyword BM25 scores are fused with dense scores by reciprocal-rank fusion. This 
 
 - [x] Public GitHub repo (all code)
 - [x] Written document addressing every deliverable and question (this file)
-- [ ] ≤10-minute Loom demo video showing a live tool call and describing the use case
+- [x] ≤10-minute Loom demo video showing a live tool call and describing the use case
 - [x] Public deployment URL reachable on phone and laptop

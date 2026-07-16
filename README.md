@@ -61,6 +61,6 @@ PY
 | Doc | What it's for |
 |---|---|
 | **[docs/RUBRIC.md](./docs/RUBRIC.md)** | The official grading rubric (100 points) and the coverage checklist: every deliverable, its points, where it's answered, and its status. **Start here to review coverage.** |
-| **[docs/SUBMISSION.md](./docs/SUBMISSION.md)** | The Certification Challenge write-up: the answer to every graded deliverable, one section per task. |
+| **[docs/deliverables.md](./docs/deliverables.md)** | The Certification Challenge write-up: the answer to every graded deliverable, one section per task. |
 | **[docs/TECH_DESIGN.md](./docs/TECH_DESIGN.md)** | How the system is built and why: architecture, the technology choices and their tradeoffs, and how the database is assembled. |
 | **[PLAN.md](./PLAN.md)** | Where the project stands and what's next, in build order. |

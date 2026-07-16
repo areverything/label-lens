@@ -1,6 +1,6 @@
 # Label Lens: Technical Design
 
-How the system is built and why. This is the home for architecture, the technology tradeoffs, and the data pipeline. It assumes you've read the [README](../README.md) for what the project is and the domain. The certification write-up ([SUBMISSION.md](./SUBMISSION.md)) links here for depth; the diagrams live there (they're graded deliverables) and are referenced below.
+How the system is built and why. This is the home for architecture, the technology tradeoffs, and the data pipeline. It assumes you've read the [README](../README.md) for what the project is and the domain. The certification write-up ([deliverables.md](./deliverables.md)) links here for depth; the diagrams live there (they're graded deliverables) and are referenced below.
 
 ## Architecture: three lanes
 
@@ -12,7 +12,7 @@ The assistant answers every question by routing it to one of three lanes, each b
 | **RAG** | Distilled **per-additive briefs**: prose on the regulatory divergence and the evidence | "Why did the EU ban it, and is it actually dangerous?" | retrieve the relevant brief passages, answer from them |
 | **Live** | Nothing stored; government APIs called at question time | "Is this recalled? Any FDA action this month?" | a live external API call |
 
-The **RAG lane is the core of the project**: it holds distilled knowledge that exists in no single database, and it is where the evaluation story lives. The Store and Live lanes make the assistant **agentic**, it decides which tool to call. The runtime flow of a single request (input → routing → tools → answer) is the agent-workflow diagram in [SUBMISSION §2.3](./SUBMISSION.md#23-agent-workflow); this section is the static "why it's shaped this way."
+The **RAG lane is the core of the project**: it holds distilled knowledge that exists in no single database, and it is where the evaluation story lives. The Store and Live lanes make the assistant **agentic**, it decides which tool to call. The runtime flow of a single request (input → routing → tools → answer) is the agent-workflow diagram in [deliverables §2.3](./deliverables.md#23-agent-workflow); this section is the static "why it's shaped this way."
 
 ## The data pipeline: how the database is built
 
@@ -46,14 +46,14 @@ Traced for titanium dioxide: `slice.py` scope entry → OFF taxonomy (name, clas
 
 ## Technology choices and tradeoffs
 
-The per-component list with a one-line justification each (a graded deliverable) is in [SUBMISSION §2.2](./SUBMISSION.md#22-infrastructure). This section covers only the choices that deserve more than a sentence.
+The per-component list with a one-line justification each (a graded deliverable) is in [deliverables §2.2](./deliverables.md#22-infrastructure). This section covers only the choices that deserve more than a sentence.
 
 - **Vector store, Chroma over Qdrant.** The brief corpus is tiny, so an embedded, file-based store with nothing to run or host beats a server like Qdrant. If the corpus grew by orders of magnitude, Qdrant's filtering and scale would justify the operational cost; here they don't.
 - **Briefs as individual markdown files, over one document or PDFs.** One `.md` per additive (split into three sections) keeps each retrieved passage mapped to exactly one additive and one section, so its citation and identity stay intact and a correction touches one small, git-diffable file; a single monolith would force chunk boundaries that straddle additives or blend a legal fact with an evidence claim. Markdown over PDF because the briefs *are* the retriever's text (no lossy PDF extraction step), the `#` / `##` headings are what the chunker parses (a PDF's layout is visual, not structural), and `.md` diffs cleanly in review where a PDF is an opaque binary. A PDF would only make sense if a source of truth were itself a PDF; here we generate the corpus, so we generate it in the format the pipeline consumes.
 - **Embeddings and reranking, local via ONNX over an API.** `bge-small` embeddings (and later the `bge-reranker`) run locally through fastembed's ONNX runtime, no torch and no external API. ONNX on CPU is fast enough because the corpus and the per-query candidate set are tiny, and it keeps the deploy light: torch's default Linux wheel drags in ~2 GB of CUDA libraries that a CPU-only free-tier host neither needs nor can afford, so avoiding torch is what makes the same code run unchanged locally and on Streamlit Community Cloud. The retrieval ladder stays cost-free and offline-capable; the only calls that must go through the paid gateway are the LLM's.
 - **LLM gateway, OpenRouter.** The certification requires routing model calls through a gateway rather than a raw provider. OpenRouter gives one key and swappable models behind a single endpoint with minimal code, which lets us tune the model for cost vs quality during evals without touching application code.
 - **UI + deployment, Streamlit + Community Cloud.** One design decision satisfies three requirements at once: a browser UI, one that works on phone and laptop, and a public endpoint. Streamlit is a single Python file; Community Cloud gives a free public URL. A hand-built FastAPI + frontend would offer more control over streaming but costs far more code for the same graded outcome.
-- **Retrieval improvements, reranker then hybrid.** The baseline is dense (meaning-based) retrieval. The reranker is added first because it directly fixes the likeliest failure: confusing near-identical briefs (for example the two preservatives E210 and E211). Hybrid (keyword BM25 fused with dense) is the second change because the questions contain exact tokens (E-numbers, CAS numbers, "21 CFR") that keyword search matches and pure meaning-based search can miss. Each is measured on the gold set (see [SUBMISSION Task 6](./SUBMISSION.md#task-6-improving-the-prototype)).
+- **Retrieval improvements, reranker then hybrid.** The baseline is dense (meaning-based) retrieval. The reranker is added first because it directly fixes the likeliest failure: confusing near-identical briefs (for example the two preservatives E210 and E211). Hybrid (keyword BM25 fused with dense) is the second change because the questions contain exact tokens (E-numbers, CAS numbers, "21 CFR") that keyword search matches and pure meaning-based search can miss. Each is measured on the gold set (see [deliverables Task 6](./deliverables.md#task-6-improving-the-prototype)).
 
 ## Safety boundary (designed in, not bolted on)
 
@@ -89,5 +89,5 @@ src/label_lens/
     regulatory_seed.py  # curated, cited legal-status rows                            [working]
     fda.py eu.py iarc.py prop65.py off_products.py   # bulk data loaders              [scaffolded]
 scripts/build_spine.py  # builds the database
-docs/                   # SUBMISSION.md, TECH_DESIGN.md
+docs/                   # deliverables.md, TECH_DESIGN.md
 ```
